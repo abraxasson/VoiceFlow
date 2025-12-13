@@ -1,0 +1,106 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+VoiceFlow is a voice-to-text paste utility for Windows built with Pyloid (Python desktop framework using PySide6/Qt WebEngine) and React. Users hold a hotkey to record audio, release to transcribe using faster-whisper, and the text is automatically pasted at the cursor.
+
+## Commands
+
+```bash
+# Initial setup (installs both Node and Python dependencies)
+pnpm run setup
+
+# Development mode (runs Vite frontend + Pyloid backend concurrently)
+pnpm run dev
+
+# Development with hot-reload for Python changes
+pnpm run dev:watch
+
+# Build desktop application
+pnpm run build
+
+# Run Python tests
+cd VoiceFlow && uv run -p .venv pytest src-pyloid/tests/
+
+# Run single test file
+uv run -p .venv pytest src-pyloid/tests/test_transcription.py -v
+
+# Run frontend only (for UI development)
+pnpm run vite
+
+# Lint frontend
+pnpm run lint
+```
+
+## Architecture
+
+### Backend (src-pyloid/)
+
+Python backend using Pyloid framework with PySide6:
+
+- **main.py** - Application entry point. Creates Pyloid app, tray icon, main dashboard window, and recording popup window. Sets up UI callbacks connecting backend events to popup state changes.
+- **server.py** - RPC server using `PyloidRPC`. Exposes methods (`get_settings`, `update_settings`, `get_history`, etc.) that frontend calls via `pyloid-js` RPC.
+- **app_controller.py** - Singleton controller orchestrating all services. Handles hotkey activate/deactivate flow: start recording -> stop recording -> transcribe -> paste at cursor -> save to history.
+
+**Services (src-pyloid/services/):**
+- `audio.py` - Microphone recording using sounddevice, streams amplitude for visualizer
+- `transcription.py` - faster-whisper model loading and transcription
+- `hotkey.py` - Global hotkey listener using keyboard library
+- `clipboard.py` - Clipboard operations and paste-at-cursor using pyautogui
+- `settings.py` - Settings management with defaults
+- `database.py` - SQLite database for settings and history (stored at ~/.VoiceFlow/VoiceFlow.db)
+
+### Frontend (src/)
+
+React 18 + TypeScript + Vite frontend:
+
+- **App.tsx** - Hash-based routing between `/popup`, `/onboarding`, and `/dashboard`
+- **lib/api.ts** - RPC wrapper using `pyloid-js` to call Python backend methods
+- **lib/types.ts** - TypeScript interfaces for Settings, HistoryEntry, Stats, Options
+- **pages/** - Popup (recording indicator), Onboarding, Dashboard
+- **components/** - Feature components plus shadcn/ui components in `components/ui/`
+
+### Frontend-Backend Communication
+
+The frontend uses `pyloid-js` RPC to call Python methods:
+```typescript
+import { rpc } from "pyloid-js";
+const settings = await rpc.call("get_settings");
+```
+
+Backend sends events to popup window via:
+```python
+popup_window.invoke('popup-state', {'state': 'recording'})
+```
+
+### Recording Flow
+
+1. User holds hotkey (Ctrl+Win)
+2. `HotkeyService.on_activate` -> `AppController._handle_hotkey_activate` -> `AudioService.start_recording`
+3. Popup transitions to "recording" state, shows amplitude visualizer
+4. User releases hotkey
+5. `AudioService.stop_recording` returns audio numpy array
+6. `TranscriptionService.transcribe` runs faster-whisper
+7. `ClipboardService.paste_at_cursor` pastes text
+8. History saved to database
+9. Popup returns to "idle" state
+
+## Key Patterns
+
+- **Singleton controller**: `get_controller()` returns singleton `AppController` instance
+- **UI callbacks**: Backend notifies frontend of state changes via callbacks set in `set_ui_callbacks()`
+- **Background threads**: Model loading and transcription run in daemon threads
+- **Path alias**: Frontend uses `@/` for `src/` imports (configured in tsconfig.json and vite.config.ts)
+
+## Testing
+
+Python tests use pytest and are in `src-pyloid/tests/`. Tests that load Whisper models are slow due to model download on first run.
+
+## UI Components
+
+Uses shadcn/ui (New York style) with Tailwind CSS v4. Add components via:
+```bash
+npx shadcn@latest add <component>
+```

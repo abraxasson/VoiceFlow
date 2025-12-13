@@ -1,0 +1,26 @@
+[project]
+name = "VoiceFlow"
+version = "1.0.0"
+readme = "README.md"
+description = "Voice-to-text paste utility for Windows"
+
+requires-python = ">=3.9"
+
+dependencies = [
+    "pyloid",
+    "faster-whisper",
+    "pynput",
+    "sounddevice",
+    "numpy",
+    "pyperclip",
+    "pyautogui",
+    "keyboard>=0.13.5",
+]
+
+[dependency-groups]
+dev = [
+    "pyloid-builder",
+    "pyloid-watcher",
+    "ruff",
+    "pytest",
+]
