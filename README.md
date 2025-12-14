@@ -68,6 +68,10 @@ Hold **`Ctrl+Win`** to speak naturally. Audio stays in RAM only. The interface v
 #### 3. Transcribe & Paste
 Release the keys. Local AI processes audio, then auto-pastes text directly at your cursor.
 
+<p align="center">
+  <img src="media/app-dash.png" alt="VoiceFlow Dashboard" width="100%">
+</p>
+
 ---
 
 ### Commercial Power. Zero Tags.
