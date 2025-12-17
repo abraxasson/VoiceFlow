@@ -118,9 +118,13 @@ class DomainLogger:
         self._log(logging.ERROR, message, **kwargs)
 
     def exception(self, message: str, **kwargs):
-        """Log an exception with traceback."""
-        self._log(logging.ERROR, message, **kwargs)
-        # The traceback will be handled by the exception info in the log record
+        """Log an exception with traceback. Call from within an except block."""
+        if kwargs:
+            extra = {'structured_data': kwargs}
+        else:
+            extra = {'structured_data': None}
+        # Use logger.exception() which automatically captures exc_info
+        self._logger.exception(message, extra=extra)
 
 
 def setup_logging(

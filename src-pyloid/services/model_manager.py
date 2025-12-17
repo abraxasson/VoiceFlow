@@ -338,7 +338,9 @@ class ModelManager:
             def update(self, n=1):
                 super().update(n)
                 # Only count byte updates (not file count updates)
-                if n > 100:  # Likely a byte update, not file count
+                # huggingface_hub uses unit="B" for byte progress bars
+                # and unit is absent or different for file count progress
+                if getattr(self, 'unit', None) == 'B' and n > 0:
                     downloaded_bytes[0] += n
                     send_progress()
 
