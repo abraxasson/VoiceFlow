@@ -1,3 +1,4 @@
+from typing import Optional
 from pyloid.rpc import PyloidRPC, RPCContext
 from app_controller import get_controller
 from services.logger import get_logger
@@ -45,17 +46,19 @@ async def get_settings():
 
 @server.method()
 async def update_settings(
-    language: str = None,
-    model: str = None,
-    autoStart: bool = None,
-    retention: int = None,
-    theme: str = None,
-    onboardingComplete: bool = None,
-    microphone: int = None,
-    holdHotkey: str = None,
-    holdHotkeyEnabled: bool = None,
-    toggleHotkey: str = None,
-    toggleHotkeyEnabled: bool = None,
+    *,
+    language: Optional[str] = None,
+    model: Optional[str] = None,
+    autoStart: Optional[bool] = None,
+    retention: Optional[int] = None,
+    theme: Optional[str] = None,
+    onboardingComplete: Optional[bool] = None,
+    microphone: Optional[int] = None,
+    saveAudioToHistory: Optional[bool] = None,
+    holdHotkey: Optional[str] = None,
+    holdHotkeyEnabled: Optional[bool] = None,
+    toggleHotkey: Optional[str] = None,
+    toggleHotkeyEnabled: Optional[bool] = None,
 ):
     controller = get_controller()
     kwargs = {}
@@ -73,6 +76,8 @@ async def update_settings(
         kwargs["onboardingComplete"] = onboardingComplete
     if microphone is not None:
         kwargs["microphone"] = microphone
+    if saveAudioToHistory is not None:
+        kwargs["saveAudioToHistory"] = saveAudioToHistory
     # Hotkey settings
     if holdHotkey is not None:
         kwargs["holdHotkey"] = holdHotkey
@@ -143,9 +148,15 @@ async def get_options():
 
 
 @server.method()
-async def get_history(limit: int = 100, offset: int = 0, search: str = None):
+async def get_history(limit: int = 100, offset: int = 0, search: str = None, include_audio_meta: bool = False):
     controller = get_controller()
-    return controller.get_history(limit, offset, search)
+    return controller.get_history(limit, offset, search, include_audio_meta)
+
+
+@server.method()
+async def get_history_audio(history_id: int):
+    controller = get_controller()
+    return controller.get_history_audio(history_id)
 
 
 @server.method()
