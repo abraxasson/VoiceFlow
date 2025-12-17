@@ -11,6 +11,7 @@ import { base64ToBlobUrl, revokeUrl, isInvalidAudioPayload } from "@/lib/audio";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -104,6 +105,7 @@ export function HomePage() {
   const durationMs = audioMeta?.durationMs;
 
   return (
+    <>
     <div className="min-h-screen w-full bg-background/50 relative overflow-x-hidden">
       {/* Background effects */}
       <div className="fixed inset-0 bg-grid opacity-20 pointer-events-none overflow-hidden" />
@@ -252,6 +254,7 @@ export function HomePage() {
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>Audio Recording</DialogTitle>
+          <DialogDescription>Playback of the recorded audio for this transcription</DialogDescription>
         </DialogHeader>
         {audioUrl ? (
           <div className="space-y-3">
@@ -273,6 +276,7 @@ export function HomePage() {
         )}
       </DialogContent>
     </Dialog>
+    </>
   );
 }
 
