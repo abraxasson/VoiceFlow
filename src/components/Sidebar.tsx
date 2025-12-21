@@ -71,7 +71,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                 />
                 <span className="flex-1">{item.label}</span>
                 {isActive && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_10px_currentColor] animate-pulse" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                 )}
               </>
             )}
@@ -123,7 +123,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           {/* Footer info */}
           <div className="pt-3 px-4 flex items-center justify-between text-[10px] text-sidebar-foreground/30 font-mono">
             <span className="badge-glow !p-1.5 !text-[10px]">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary" />
               v1.1.0
             </span>
             <span className="flex items-center gap-1">

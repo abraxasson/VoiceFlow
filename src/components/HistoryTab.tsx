@@ -70,7 +70,7 @@ export function HistoryTab() {
       <div className="w-full max-w-[1600px] mx-auto p-6 md:p-10 space-y-8">
         
         {/* Header & Search */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
            <div>
               <h1 className="text-4xl font-bold tracking-tighter text-foreground mb-2">History</h1>
               <p className="text-muted-foreground font-light text-lg">
@@ -91,7 +91,7 @@ export function HistoryTab() {
         </div>
 
         {/* Content */}
-        <div className="min-h-[500px] animate-in fade-in slide-in-from-top-8 duration-700 delay-100">
+        <div className="min-h-[500px]">
           {loading ? (
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {[...Array(8)].map((_, i) => (
@@ -133,9 +133,9 @@ export function HistoryTab() {
                    {/* Grid */}
                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                       {entries.map((entry) => (
-                        <Card 
-                          key={entry.id} 
-                          className="group flex flex-col h-full bg-card/60 backdrop-blur-sm border-border/50 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:bg-card hover:border-primary/20 transition-all duration-300"
+                        <Card
+                          key={entry.id}
+                          className="group flex flex-col h-full bg-card/60 backdrop-blur-sm border-border/50 shadow-sm hover:bg-card hover:border-primary/20 transition-colors duration-150"
                         >
                           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                              <span className="text-xs font-mono text-muted-foreground bg-secondary/50 px-2 py-1 rounded flex items-center gap-1.5">

@@ -121,7 +121,7 @@ export function HistoryPage() {
       <div className="w-full max-w-[1600px] mx-auto p-6 md:p-10 space-y-10 relative z-10">
 
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div>
             <h1 className="text-4xl md:text-5xl font-bold tracking-tighter text-foreground mb-2">
               Full <span className="headline-serif text-primary">History</span>
@@ -143,7 +143,7 @@ export function HistoryPage() {
         </div>
 
         {/* Content */}
-        <section className="animate-in fade-in slide-in-from-top-8 duration-700 delay-100 min-h-[500px]">
+        <section className="min-h-[500px]">
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                {[...Array(12)].map((_, i) => (
@@ -185,7 +185,7 @@ export function HistoryPage() {
                       return (
                         <Card
                           key={entry.id}
-                          className="group flex flex-col justify-between h-full bg-card/60 backdrop-blur-sm border-border/50 hover:bg-card hover:border-primary/20 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                          className="group flex flex-col justify-between h-full bg-card/60 backdrop-blur-sm border-border/50 hover:bg-card hover:border-primary/20 transition-colors duration-150"
                         >
                           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <div className="flex items-center gap-2">

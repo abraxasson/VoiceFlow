@@ -30,7 +30,7 @@ export function HomePage() {
     const load = async () => {
       try {
         setError(null);
-        const data = await api.getHistory(50, 0, undefined, false); // Load more items for the grid
+        const data = await api.getHistory(50, 0, undefined, false);
         setHistory(data);
       } catch (error) {
         console.error("Failed to load history:", error);
@@ -116,7 +116,7 @@ export function HomePage() {
 
       <div className="w-full max-w-[1600px] mx-auto p-6 md:p-10 space-y-10 relative z-10">
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div>
             <h1 className="text-4xl md:text-5xl font-bold tracking-tighter text-foreground mb-2">
               Dash<span className="headline-serif text-primary">board</span>
@@ -126,7 +126,7 @@ export function HomePage() {
               insights.
             </p>
           </div>
-          <div className="w-full md:w-auto">
+          <div className="w-full md:w-auto flex items-center gap-3">
             <div className="relative group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
               <Input
@@ -140,7 +140,7 @@ export function HomePage() {
         </div>
 
         {/* Stats / Hero Section */}
-        <section className="animate-in fade-in slide-in-from-top-6 duration-700 delay-100">
+        <section>
           <StatsHeader />
         </section>
 
@@ -148,7 +148,7 @@ export function HomePage() {
         <div className="divider-gradient" />
 
         {/* Recent History Grid */}
-        <section className="space-y-8 animate-in fade-in slide-in-from-top-8 duration-700 delay-200">
+        <section className="space-y-8">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-semibold tracking-tight flex items-center gap-3">
               <div className="p-2 rounded-lg bg-primary/10 text-primary">
@@ -295,7 +295,7 @@ function HistoryCard({
 }) {
   const hasAudio = !!entry.has_audio;
   return (
-    <div className="group glass-card flex flex-col justify-between h-full p-5 hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1 transition-all duration-300">
+    <div className="group glass-card flex flex-col justify-between h-full p-5 transition-colors duration-150">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">

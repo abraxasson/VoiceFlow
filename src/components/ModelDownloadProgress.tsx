@@ -150,7 +150,7 @@ export function ModelDownloadProgress({
   // Render based on state
   if (state === "completed") {
     return (
-      <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
+      <div className="space-y-4">
         <div className="glass-card p-6 text-center">
           <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
             <Check className="w-6 h-6 text-primary" />
@@ -170,7 +170,7 @@ export function ModelDownloadProgress({
     const huggingFaceUrl = MODEL_HUGGINGFACE_URLS[modelName];
 
     return (
-      <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500 max-w-md w-full">
+      <div className="space-y-4 max-w-md w-full">
         <div className="glass-card p-6 text-center">
           <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-destructive/10 border border-destructive/20 flex items-center justify-center">
             <AlertCircle className="w-6 h-6 text-destructive" />
@@ -220,7 +220,7 @@ export function ModelDownloadProgress({
 
   if (state === "cancelled") {
     return (
-      <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
+      <div className="space-y-4">
         <div className="glass-card p-6 text-center">
           <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-muted/50 border border-border flex items-center justify-center">
             <X className="w-6 h-6 text-muted-foreground" />
@@ -241,13 +241,13 @@ export function ModelDownloadProgress({
 
   // Downloading state
   return (
-    <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500 max-w-md w-full">
+    <div className="space-y-6 max-w-md w-full">
       <div className="glass-card p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
               {state === "downloading" ? (
-                <Download className="w-5 h-5 text-primary animate-pulse" />
+                <Download className="w-5 h-5 text-primary" />
               ) : (
                 <Loader2 className="w-5 h-5 text-primary animate-spin" />
               )}

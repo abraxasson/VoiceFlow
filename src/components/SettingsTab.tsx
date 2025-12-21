@@ -251,7 +251,7 @@ export function SettingsTab() {
 
       <div className="w-full max-w-[1600px] mx-auto p-6 md:p-10 space-y-10 relative z-10">
         {/* Header */}
-        <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-top-4 duration-500">
+        <div className="flex flex-col gap-2">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tighter text-foreground">
             Sett<span className="headline-serif text-primary">ings</span>
           </h1>
@@ -264,7 +264,7 @@ export function SettingsTab() {
         <div className="divider-gradient" />
 
         {/* BENTO GRID */}
-        <div className="grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-6 animate-in fade-in slide-in-from-top-8 duration-700 delay-100">
+        <div className="grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-6">
           {/* 1. Language (Span 4) */}
           <BentoSettingCard
             title="Language"
@@ -651,7 +651,7 @@ function BentoSettingCard({
   return (
     <div
       className={cn(
-        "group glass-card flex flex-col justify-between p-6 hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1 transition-all duration-300",
+        "group glass-card flex flex-col justify-between p-6 transition-colors duration-150",
         className
       )}
     >

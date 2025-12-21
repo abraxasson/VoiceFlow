@@ -41,7 +41,7 @@ import {
 // --- Step Components ---
 
 const StepWelcome = () => (
-  <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+  <div className="space-y-6">
     <p className="text-xl font-light leading-relaxed text-muted-foreground max-w-lg">
       Dictation designed for{" "}
       <span className="headline-serif text-foreground">privacy</span> and{" "}
@@ -49,13 +49,12 @@ const StepWelcome = () => (
     </p>
 
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      {ONBOARDING_FEATURES.map((feature, idx) => (
+      {ONBOARDING_FEATURES.map((feature) => (
         <div
           key={feature.label}
-          className="group glass-card flex flex-col items-center text-center gap-3 p-6 transition-all hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-1 animate-in slide-in-from-bottom-4 duration-500"
-          style={{ animationDelay: `${idx * 100}ms` }}
+          className="group glass-card flex flex-col items-center text-center gap-3 p-6"
         >
-          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary transition-transform group-hover:scale-110 border border-primary/20">
+          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
             <feature.icon className="w-6 h-6" />
           </div>
           <div>
@@ -145,7 +144,7 @@ const StepAudio = ({
   };
 
   return (
-    <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500 max-w-xl">
+    <div className="space-y-6 max-w-xl">
       <div className="glass-card p-1">
         <Select
           value={String(microphone)}
@@ -180,7 +179,7 @@ const StepAudio = ({
           />
         ) : (
           <div className="flex items-center gap-2 text-muted-foreground text-sm">
-            <span className="w-2 h-2 rounded-full bg-muted animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-muted" />
             Waiting for microphone...
           </div>
         )}
@@ -331,7 +330,7 @@ const StepHardware = ({
     : device.toUpperCase();
 
   return (
-    <div className="flex gap-6 animate-in slide-in-from-bottom-4 duration-500 w-full max-w-5xl">
+    <div className="flex gap-6 w-full max-w-5xl">
       {/* Left side - Device selection grid */}
       <div className="flex-1 space-y-4">
         <div className="flex items-center justify-between">
@@ -366,18 +365,17 @@ const StepHardware = ({
                 aria-checked={isActive}
                 disabled={isDisabled}
                 className={`
-                  relative p-4 rounded-xl text-left transition-all duration-200 group
-                  flex flex-col gap-2 animate-in slide-in-from-bottom-4
+                  relative p-4 rounded-xl text-left transition-colors duration-150 group
+                  flex flex-col gap-2
                   ${
                     isActive
-                      ? "glass-strong border-primary/50 shadow-md shadow-primary/10"
+                      ? "glass-strong border-primary/50"
                       : isDisabled
                         ? "glass-card opacity-50 cursor-not-allowed"
                         : "glass-card hover:bg-muted/50"
                   }
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1
                 `}
-                style={{ animationDelay: `${idx * 30}ms` }}
                 onClick={() => !isDisabled && handleDeviceSelect(d.id)}
               >
                 <div className="flex items-center justify-between w-full">
@@ -422,7 +420,7 @@ const StepHardware = ({
         {showDownloadButton && (
           <div className="glass-card p-4 space-y-3">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <div className="w-2 h-2 rounded-full bg-amber-500" />
               <span className="text-sm font-medium text-foreground">GPU Acceleration Required</span>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -470,7 +468,7 @@ const StepHardware = ({
       </div>
 
       {/* Right side - Details panel */}
-      <div className="w-72 flex-shrink-0 animate-in slide-in-from-right-4 duration-300">
+      <div className="w-72 flex-shrink-0">
         <div className="glass-card p-4 space-y-4 h-[400px] overflow-y-auto">
           {/* Device Info Header */}
           {selectedDevice && (
@@ -647,7 +645,7 @@ const StepModel = ({
   };
 
   return (
-    <div className="flex gap-6 animate-in slide-in-from-bottom-4 duration-500 w-full max-w-6xl">
+    <div className="flex gap-6 w-full max-w-6xl">
       {/* Left side - Model grid */}
       <div className="flex-1 space-y-4">
         <div className="glass-card p-1 max-w-sm">
@@ -708,16 +706,15 @@ const StepModel = ({
                   role="radio"
                   aria-checked={isActive}
                   className={`
-                    relative p-2.5 rounded-md text-left transition-all duration-200 group
-                    flex flex-col gap-0 animate-in slide-in-from-bottom-4
+                    relative p-2.5 rounded-md text-left transition-colors duration-150 group
+                    flex flex-col gap-0
                     ${
                       isActive
-                        ? "glass-strong border-primary/50 shadow-md shadow-primary/10"
+                        ? "glass-strong border-primary/50"
                         : "glass-card hover:bg-muted/50"
                     }
                     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1
                   `}
-                  style={{ animationDelay: `${idx * 20}ms` }}
                   onClick={() => handleModelSelect(m.id)}
                 >
                   <div className="flex items-center justify-between w-full">
@@ -745,7 +742,7 @@ const StepModel = ({
 
       {/* Right side - Model details card */}
       {selectedModel && (
-        <div className="w-72 flex-shrink-0 animate-in slide-in-from-right-4 duration-300">
+        <div className="w-72 flex-shrink-0">
           <div className="glass-card p-4 space-y-4 h-[360px] overflow-y-auto">
             {/* Header */}
             <div className="space-y-1">
@@ -818,7 +815,7 @@ const StepTheme = ({
   autoStart: boolean;
   setAutoStart: (b: boolean) => void;
 }) => (
-  <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+  <div className="space-y-8">
     <fieldset>
       <legend className="text-sm font-medium text-muted-foreground mb-4">
         Interface Theme
@@ -837,19 +834,18 @@ const StepTheme = ({
               role="radio"
               aria-checked={isActive}
               className={`
-                relative p-5 rounded-2xl flex flex-col items-center gap-4 transition-all duration-300 animate-in slide-in-from-bottom-4
+                relative p-5 rounded-2xl flex flex-col items-center gap-4 transition-colors duration-150
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2
                 ${
                   isActive
-                    ? "glass-strong border-primary/50 shadow-lg shadow-primary/10 scale-105"
-                    : "glass-card hover:shadow-md hover:-translate-y-0.5"
+                    ? "glass-strong border-primary/50"
+                    : "glass-card"
                 }
               `}
-              style={{ animationDelay: `${idx * 50}ms` }}
               onClick={() => setTheme(opt.val as Settings["theme"])}
             >
               <div
-                className={`w-14 h-14 rounded-full border-2 shadow-sm transition-all duration-500 ${isActive ? "rotate-12 scale-110" : ""} ${
+                className={`w-14 h-14 rounded-full border-2 shadow-sm ${
                   opt.val === "light"
                     ? "bg-[#faf8f5] border-gray-200"
                     : opt.val === "dark"
@@ -890,7 +886,7 @@ const StepTheme = ({
 );
 
 const StepFinal = () => (
-  <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500 max-w-lg">
+  <div className="space-y-6 max-w-lg">
     <div className="glass-card p-8 text-center relative overflow-hidden">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="orb orb-primary w-[200px] h-[200px] absolute -top-20 left-1/2 -translate-x-1/2 opacity-30" />
@@ -1231,7 +1227,7 @@ export function Onboarding() {
       {error && options && (
         <div
           role="alert"
-          className="fixed top-6 left-1/2 -translate-x-1/2 z-50 glass-strong text-destructive px-6 py-3 rounded-full flex items-center gap-3 shadow-lg animate-in slide-in-from-top-4"
+          className="fixed top-6 left-1/2 -translate-x-1/2 z-50 glass-strong text-destructive px-6 py-3 rounded-full flex items-center gap-3 shadow-lg"
         >
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
           <span className="text-sm font-medium">{error}</span>
@@ -1260,7 +1256,7 @@ export function Onboarding() {
 
         {/* Header */}
         <header className="text-center mb-10 space-y-4">
-          <div className="w-14 h-14 mx-auto rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-4 animate-in zoom-in duration-300">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-4">
             <StepIcon className="w-7 h-7 text-primary" />
           </div>
 

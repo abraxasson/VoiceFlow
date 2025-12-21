@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
-import { Flame, FileText, Type, Settings2, Languages, Cpu, Mic } from "lucide-react";
+import { Flame, FileText, Type, Settings2, Languages, Cpu, Mic, Zap } from "lucide-react";
 import { api } from "@/lib/api";
-import type { Stats } from "@/lib/types";
+import type { Stats, GpuInfo } from "@/lib/types";
 
 type ConfigData = {
   model: string;
   language: string;
   micName: string;
+  computeDevice: string;
+  isUsingGpu: boolean;
 };
 
 export function StatsHeader() {
@@ -20,10 +22,11 @@ export function StatsHeader() {
         const statsData = await api.getStats();
         setStats(statsData);
 
-        // Load config (settings + options to map IDs to names)
-        const [settings, options] = await Promise.all([
+        // Load config (settings + options + GPU info)
+        const [settings, options, gpuInfo] = await Promise.all([
           api.getSettings(),
           api.getOptions(),
+          api.getGpuInfo(),
         ]);
 
         // Find mic name
@@ -35,10 +38,18 @@ export function StatsHeader() {
             ? "System Default"
             : currentMic?.name || "Unknown Mic";
 
+        // Determine compute device
+        const isUsingGpu = settings.device === "cuda" || (settings.device === "auto" && gpuInfo.cudaAvailable);
+        const computeDevice = isUsingGpu
+          ? gpuInfo.gpuName?.replace("NVIDIA ", "").replace(" Laptop GPU", "") || "CUDA GPU"
+          : "CPU";
+
         setConfig({
           model: settings.model,
           language: settings.language,
           micName: micName,
+          computeDevice,
+          isUsingGpu,
         });
       } catch (error) {
         console.error("Failed to load data:", error);
@@ -90,8 +101,8 @@ export function StatsHeader() {
 
           <div className="mt-8 flex gap-4 flex-wrap">
             {/* Streak */}
-            <div className="glass-strong flex items-center gap-3 rounded-2xl px-5 py-3 transition-all hover:shadow-lg hover:shadow-primary/5 group/stat">
-              <div className="p-2 bg-orange-500/20 rounded-xl text-orange-400 transition-transform group-hover/stat:scale-110">
+            <div className="glass-strong flex items-center gap-3 rounded-2xl px-5 py-3">
+              <div className="p-2 bg-orange-500/20 rounded-xl text-orange-400">
                 <Flame className="w-5 h-5" />
               </div>
               <div>
@@ -108,8 +119,8 @@ export function StatsHeader() {
             </div>
 
             {/* Notes */}
-            <div className="glass-strong flex items-center gap-3 rounded-2xl px-5 py-3 transition-all hover:shadow-lg hover:shadow-primary/5 group/stat">
-              <div className="p-2 bg-blue-500/20 rounded-xl text-blue-400 transition-transform group-hover/stat:scale-110">
+            <div className="glass-strong flex items-center gap-3 rounded-2xl px-5 py-3">
+              <div className="p-2 bg-blue-500/20 rounded-xl text-blue-400">
                 <FileText className="w-5 h-5" />
               </div>
               <div>
@@ -174,6 +185,15 @@ export function StatsHeader() {
               value={config?.micName || "Loading..."}
               truncate
             />
+
+            {/* Compute Device */}
+            <ConfigItem
+              icon={config?.isUsingGpu ? Zap : Cpu}
+              label="Compute"
+              value={config?.computeDevice || "Loading..."}
+              highlight={config?.isUsingGpu}
+              truncate
+            />
           </div>
         </div>
       </div>
@@ -186,22 +206,28 @@ function ConfigItem({
   label,
   value,
   truncate = false,
+  highlight = false,
 }: {
   icon: React.ElementType;
   label: string;
   value: string;
   truncate?: boolean;
+  highlight?: boolean;
 }) {
   return (
     <div className="group/item">
       <div className="flex items-center gap-1.5 mb-1.5">
-        <Icon className="w-3 h-3 text-muted-foreground/60" />
+        <Icon className={`w-3 h-3 ${highlight ? "text-green-500" : "text-muted-foreground/60"}`} />
         <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
           {label}
         </span>
       </div>
       <div
-        className={`text-sm font-semibold text-foreground tracking-tight pl-4 border-l-2 border-primary/20 group-hover/item:border-primary transition-colors ${truncate ? "truncate" : ""}`}
+        className={`text-sm font-semibold tracking-tight pl-4 border-l-2 transition-colors ${truncate ? "truncate" : ""} ${
+          highlight
+            ? "text-green-500 border-green-500/40 group-hover/item:border-green-500"
+            : "text-foreground border-primary/20 group-hover/item:border-primary"
+        }`}
         title={truncate ? value : undefined}
       >
         {value}
