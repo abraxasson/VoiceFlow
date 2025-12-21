@@ -369,3 +369,11 @@ async def cancel_model_download():
         return {"success": True, "cancelled": True}
 
     return {"success": True, "cancelled": False}
+
+
+@server.method()
+async def clear_model_cache():
+    """Clear all cached Whisper models from the HuggingFace cache directory."""
+    manager = get_model_manager()
+    result = manager.clear_cache()
+    return result

@@ -1,9 +1,29 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Download, X, Check, AlertCircle, Loader2 } from "lucide-react";
+import { Download, X, Check, AlertCircle, Loader2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { api } from "@/lib/api";
 import type { DownloadProgress, DownloadComplete } from "@/lib/types";
+
+// HuggingFace URLs for manual download
+const MODEL_HUGGINGFACE_URLS: Record<string, string> = {
+  "tiny": "https://huggingface.co/Systran/faster-whisper-tiny",
+  "base": "https://huggingface.co/Systran/faster-whisper-base",
+  "small": "https://huggingface.co/Systran/faster-whisper-small",
+  "medium": "https://huggingface.co/Systran/faster-whisper-medium",
+  "large-v1": "https://huggingface.co/Systran/faster-whisper-large-v1",
+  "large-v2": "https://huggingface.co/Systran/faster-whisper-large-v2",
+  "large-v3": "https://huggingface.co/Systran/faster-whisper-large-v3",
+  "turbo": "https://huggingface.co/Systran/faster-whisper-large-v3-turbo",
+  "tiny.en": "https://huggingface.co/Systran/faster-whisper-tiny.en",
+  "base.en": "https://huggingface.co/Systran/faster-whisper-base.en",
+  "small.en": "https://huggingface.co/Systran/faster-whisper-small.en",
+  "medium.en": "https://huggingface.co/Systran/faster-whisper-medium.en",
+  "distil-small.en": "https://huggingface.co/Systran/faster-distil-whisper-small.en",
+  "distil-medium.en": "https://huggingface.co/Systran/faster-distil-whisper-medium.en",
+  "distil-large-v2": "https://huggingface.co/Systran/faster-distil-whisper-large-v2",
+  "distil-large-v3": "https://huggingface.co/Systran/faster-distil-whisper-large-v3",
+};
 
 interface ModelDownloadProgressProps {
   modelName: string;
@@ -147,8 +167,10 @@ export function ModelDownloadProgress({
   }
 
   if (state === "error") {
+    const huggingFaceUrl = MODEL_HUGGINGFACE_URLS[modelName];
+
     return (
-      <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
+      <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500 max-w-md w-full">
         <div className="glass-card p-6 text-center">
           <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-destructive/10 border border-destructive/20 flex items-center justify-center">
             <AlertCircle className="w-6 h-6 text-destructive" />
@@ -159,10 +181,39 @@ export function ModelDownloadProgress({
           <p className="text-sm text-muted-foreground mb-4">
             {error || "An error occurred"}
           </p>
-          <Button onClick={handleRetry} variant="outline" className="rounded-xl">
-            Try Again
-          </Button>
+          <div className="flex flex-col gap-2">
+            <Button onClick={handleRetry} variant="outline" className="rounded-xl">
+              Try Again
+            </Button>
+            {huggingFaceUrl && (
+              <Button
+                variant="ghost"
+                className="rounded-xl text-xs"
+                onClick={() => api.openExternalUrl(huggingFaceUrl)}
+              >
+                <ExternalLink className="w-3 h-3 mr-1.5" />
+                Download from HuggingFace
+              </Button>
+            )}
+          </div>
         </div>
+
+        {huggingFaceUrl && (
+          <div className="glass-card p-4 text-left">
+            <p className="text-xs font-medium text-foreground mb-2">Manual Download Instructions:</p>
+            <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
+              <li>Click "Download from HuggingFace" above</li>
+              <li>Download all files (model.bin, config.json, etc.)</li>
+              <li>
+                Place files in:<br />
+                <code className="text-[10px] bg-muted/50 px-1.5 py-0.5 rounded mt-1 inline-block break-all">
+                  %USERPROFILE%\.cache\huggingface\hub\
+                </code>
+              </li>
+              <li>Restart VoiceFlow</li>
+            </ol>
+          </div>
+        )}
       </div>
     );
   }

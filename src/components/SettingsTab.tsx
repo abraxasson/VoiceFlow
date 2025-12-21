@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Globe,
   Mic,
@@ -22,6 +23,7 @@ import {
   Keyboard,
   Hand,
   ToggleRight,
+  HardDrive,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Settings, Options } from "@/lib/types";
@@ -489,58 +491,7 @@ export function SettingsTab() {
           </BentoSettingCard>
 
           {/* 9. Danger Zone (Span 4) */}
-          <BentoSettingCard
-            title="Danger Zone"
-            description="Irreversible actions"
-            icon={Trash2}
-            className="md:col-span-6 lg:col-span-4 !border-destructive/20"
-            iconClass="text-destructive bg-destructive/10"
-          >
-            <div className="mt-auto">
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <button className="w-full flex items-center justify-center gap-2 h-12 rounded-xl border border-destructive/30 bg-destructive/5 hover:bg-destructive hover:text-white hover:border-destructive transition-all text-sm font-medium text-destructive">
-                    <Trash2 className="w-4 h-4" />
-                    Reset All Data
-                  </button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="glass-strong rounded-2xl">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will permanently delete all your transcription
-                      history, settings, and preferences. You will need to
-                      complete the onboarding process again. This action cannot
-                      be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel className="rounded-xl">
-                      Cancel
-                    </AlertDialogCancel>
-                    <AlertDialogAction
-                      className="bg-destructive text-white hover:bg-destructive/90 rounded-xl"
-                      onClick={async () => {
-                        try {
-                          await api.resetAllData();
-                          toast.success("All data deleted - returning to setup");
-                          setTimeout(() => {
-                            window.location.hash = "/onboarding";
-                            window.location.reload();
-                          }, 500);
-                        } catch (error) {
-                          console.error("Failed to delete data:", error);
-                          toast.error("Failed to delete data");
-                        }
-                      }}
-                    >
-                      Delete Everything
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-          </BentoSettingCard>
+          <DangerZoneCard />
         </div>
       </div>
 
@@ -598,5 +549,132 @@ function BentoSettingCard({
       </div>
       <div className="flex-grow flex flex-col justify-end">{children}</div>
     </div>
+  );
+}
+
+// DANGER ZONE CARD WITH DELETE OPTIONS
+function DangerZoneCard() {
+  const [deleteAppData, setDeleteAppData] = useState(true);
+  const [deleteModels, setDeleteModels] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      // Delete app data (history, settings, etc.)
+      if (deleteAppData) {
+        await api.resetAllData();
+      }
+
+      // Delete models (clear HuggingFace cache)
+      if (deleteModels) {
+        await api.clearModelCache();
+      }
+
+      const message = deleteAppData && deleteModels
+        ? "All data and models deleted"
+        : deleteAppData
+          ? "App data deleted"
+          : "Models deleted";
+
+      toast.success(`${message} - returning to setup`);
+      setTimeout(() => {
+        window.location.hash = "/onboarding";
+        window.location.reload();
+      }, 500);
+    } catch (error) {
+      console.error("Failed to delete data:", error);
+      toast.error("Failed to delete data");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const canDelete = deleteAppData || deleteModels;
+
+  return (
+    <BentoSettingCard
+      title="Danger Zone"
+      description="Irreversible actions"
+      icon={Trash2}
+      className="md:col-span-6 lg:col-span-4 !border-destructive/20"
+      iconClass="text-destructive bg-destructive/10"
+    >
+      <div className="mt-auto">
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <button className="w-full flex items-center justify-center gap-2 h-12 rounded-xl border border-destructive/30 bg-destructive/5 hover:bg-destructive hover:text-white hover:border-destructive transition-all text-sm font-medium text-destructive">
+              <Trash2 className="w-4 h-4" />
+              Reset Data
+            </button>
+          </AlertDialogTrigger>
+          <AlertDialogContent className="glass-strong rounded-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>What would you like to delete?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Select what data to remove. These actions cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+
+            <div className="space-y-4 py-4">
+              {/* App Data Option */}
+              <label className="flex items-start gap-3 p-3 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors cursor-pointer">
+                <Checkbox
+                  checked={deleteAppData}
+                  onCheckedChange={(checked) => setDeleteAppData(checked === true)}
+                  className="mt-0.5"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <FolderOpen className="w-4 h-4 text-muted-foreground" />
+                    <span className="font-medium text-sm">App Data</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    History, settings, preferences, audio recordings
+                  </p>
+                  <code className="text-[10px] text-muted-foreground/70 mt-1 block">
+                    %USERPROFILE%\.VoiceFlow\
+                  </code>
+                </div>
+              </label>
+
+              {/* Models Option */}
+              <label className="flex items-start gap-3 p-3 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors cursor-pointer">
+                <Checkbox
+                  checked={deleteModels}
+                  onCheckedChange={(checked) => setDeleteModels(checked === true)}
+                  className="mt-0.5"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <HardDrive className="w-4 h-4 text-muted-foreground" />
+                    <span className="font-medium text-sm">AI Models</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Downloaded Whisper models (requires re-download)
+                  </p>
+                  <code className="text-[10px] text-muted-foreground/70 mt-1 block">
+                    %USERPROFILE%\.cache\huggingface\hub\
+                  </code>
+                </div>
+              </label>
+            </div>
+
+            <AlertDialogFooter>
+              <AlertDialogCancel className="rounded-xl">
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-white hover:bg-destructive/90 rounded-xl disabled:opacity-50"
+                onClick={handleDelete}
+                disabled={!canDelete || isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Delete Selected"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </BentoSettingCard>
   );
 }

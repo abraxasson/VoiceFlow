@@ -18,6 +18,7 @@ from typing import Callable, Optional
 import threading
 import time
 import os
+import io
 
 from services.logger import get_logger
 
@@ -359,6 +360,11 @@ class ModelManager:
             def __init__(self, *args, **kwargs):
                 # Filter out any unexpected kwargs that tqdm doesn't accept
                 kwargs.pop('name', None)
+                # CRITICAL: Redirect tqdm output to dummy stream to prevent crash in windowed apps
+                # When packaged with PyInstaller --windowed, sys.stderr is None
+                # which causes "'NoneType' object has no attribute 'write'" error
+                # We track progress via callbacks, so tqdm console output is not needed
+                kwargs['file'] = io.StringIO()
                 super().__init__(*args, **kwargs)
 
             def update(self, n=1):
@@ -511,6 +517,74 @@ class ModelManager:
                 raise RuntimeError(f"Failed to download model '{model_name}'")
 
         return self.load_model(model_name)
+
+    def clear_cache(self) -> dict:
+        """
+        Clear all cached Whisper models from the HuggingFace cache directory.
+
+        Returns:
+            dict with:
+                - success: bool indicating if operation succeeded
+                - deleted_bytes: total bytes deleted
+                - deleted_models: list of model names that were deleted
+                - error: error message if failed
+        """
+        import shutil
+
+        log.info("Clearing model cache")
+
+        deleted_bytes = 0
+        deleted_models = []
+
+        try:
+            # Get HuggingFace cache directory
+            cache_dir = Path.home() / ".cache" / "huggingface" / "hub"
+
+            if not cache_dir.exists():
+                log.info("Cache directory does not exist, nothing to clear")
+                return {
+                    "success": True,
+                    "deleted_bytes": 0,
+                    "deleted_models": [],
+                    "error": None
+                }
+
+            # Find and delete all faster-whisper model directories
+            # HuggingFace stores models as: models--{org}--{repo}
+            for model_name, repo_id in MODEL_REPOS.items():
+                # Convert repo_id to HuggingFace cache folder name
+                # e.g., "Systran/faster-whisper-tiny" -> "models--Systran--faster-whisper-tiny"
+                cache_folder_name = f"models--{repo_id.replace('/', '--')}"
+                model_cache_path = cache_dir / cache_folder_name
+
+                if model_cache_path.exists():
+                    # Calculate size before deleting
+                    size = sum(f.stat().st_size for f in model_cache_path.rglob("*") if f.is_file())
+                    deleted_bytes += size
+                    deleted_models.append(model_name)
+
+                    log.info("Deleting model cache", model=model_name, path=str(model_cache_path), size_bytes=size)
+                    shutil.rmtree(model_cache_path)
+
+            log.info("Model cache cleared",
+                     deleted_count=len(deleted_models),
+                     deleted_bytes=deleted_bytes)
+
+            return {
+                "success": True,
+                "deleted_bytes": deleted_bytes,
+                "deleted_models": deleted_models,
+                "error": None
+            }
+
+        except Exception as e:
+            log.error("Failed to clear model cache", error=str(e))
+            return {
+                "success": False,
+                "deleted_bytes": deleted_bytes,
+                "deleted_models": deleted_models,
+                "error": str(e)
+            }
 
 
 # Singleton instance

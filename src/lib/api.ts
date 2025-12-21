@@ -92,6 +92,10 @@ export const api = {
     return rpc.call("cancel_model_download");
   },
 
+  async clearModelCache(): Promise<{ success: boolean; deleted_bytes: number; deleted_models: string[]; error: string | null }> {
+    return rpc.call("clear_model_cache");
+  },
+
   // Hotkey validation
   async validateHotkey(
     hotkey: string,
