@@ -10,6 +10,7 @@ log = get_logger("hotkey")
 # This order matches what the keyboard library expects
 MODIFIER_ORDER = ['ctrl', 'alt', 'shift', 'win']
 VALID_MODIFIERS = {'ctrl', 'alt', 'shift', 'win', 'windows', 'left windows', 'right windows'}
+FUNCTION_KEYS = {f'f{i}' for i in range(1, 13)}
 
 
 def normalize_hotkey(hotkey: str) -> str:
@@ -69,6 +70,10 @@ def validate_hotkey(hotkey: str) -> tuple[bool, str]:
         return False, "Hotkey cannot be empty"
 
     parts = [p.strip().lower() for p in hotkey.split('+')]
+
+    # Allow single function keys (F1-F12) without any modifier
+    if len(parts) == 1 and parts[0] in FUNCTION_KEYS:
+        return True, ""
 
     if len(parts) < 2:
         return False, "Hotkey must have at least two keys"

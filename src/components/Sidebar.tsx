@@ -1,9 +1,10 @@
-import { NavLink } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import { Mic, Home, History, Settings, Sparkles, Github, Heart, MessageSquare } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatHotkey } from "@/lib/utils";
 import { api } from "@/lib/api";
 
-const GITHUB_REPO_URL = "https://github.com/infiniV/VoiceFlow";
+const GITHUB_REPO_URL = "https://github.com/abraxasson/VoiceFlow";
 
 const navItems = [
   { to: "/dashboard", icon: Home, label: "Home" },
@@ -16,6 +17,21 @@ interface SidebarProps {
 }
 
 export function Sidebar({ onNavigate }: SidebarProps) {
+  const [activeHotkey, setActiveHotkey] = useState<{ key: string; mode: "hold" | "toggle" } | null>(null);
+  const location = useLocation();
+
+  useEffect(() => {
+    api.getSettings().then((s) => {
+      if (s.holdHotkeyEnabled && s.holdHotkey) {
+        setActiveHotkey({ key: s.holdHotkey, mode: "hold" });
+      } else if (s.toggleHotkeyEnabled && s.toggleHotkey) {
+        setActiveHotkey({ key: s.toggleHotkey, mode: "toggle" });
+      } else {
+        setActiveHotkey(null);
+      }
+    }).catch(() => {});
+  }, [location.pathname]);
+
   return (
     <aside className="w-64 h-screen bg-sidebar flex flex-col border-r border-sidebar-border relative overflow-hidden">
       {/* Animated gradient orbs */}
@@ -93,11 +109,17 @@ export function Sidebar({ onNavigate }: SidebarProps) {
               <span className="text-xs font-semibold text-sidebar-foreground/80 uppercase tracking-wider">Pro Tip</span>
             </div>
             <p className="text-xs text-sidebar-foreground/60 leading-relaxed">
-              Press{" "}
-              <kbd className="text-primary font-semibold font-mono bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
-                Ctrl+Win
-              </kbd>{" "}
-              anywhere to start dictating.
+              {activeHotkey ? (
+                <>
+                  {activeHotkey.mode === "hold" ? "Hold" : "Press"}{" "}
+                  <kbd className="text-primary font-semibold font-mono bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
+                    {formatHotkey(activeHotkey.key)}
+                  </kbd>{" "}
+                  anywhere to {activeHotkey.mode === "hold" ? "start dictating." : "toggle dictation."}
+                </>
+              ) : (
+                <>Assign a hotkey in <span className="text-primary font-semibold">Settings</span> to start dictating.</>
+              )}
             </p>
           </div>
         </div>

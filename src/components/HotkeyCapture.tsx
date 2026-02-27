@@ -20,6 +20,7 @@ const KEY_MAP: Record<string, string> = {
 };
 
 const MODIFIER_KEYS = new Set(["ctrl", "shift", "alt", "win"]);
+const FUNCTION_KEYS = new Set(["f1","f2","f3","f4","f5","f6","f7","f8","f9","f10","f11","f12"]);
 
 // Canonical modifier order - must match backend MODIFIER_ORDER in hotkey.py
 const MODIFIER_ORDER = ["ctrl", "alt", "shift", "win"];
@@ -76,7 +77,30 @@ export function HotkeyCapture({
       e.stopPropagation();
 
       // When any key is released, capture the current combination
-      if (pressedKeys.size >= 2) {
+      if (pressedKeys.size === 1) {
+        const singleKey = Array.from(pressedKeys)[0];
+        if (FUNCTION_KEYS.has(singleKey)) {
+          if (onValidate) {
+            try {
+              const result = await onValidate(singleKey);
+              if (!result.valid) {
+                setError(result.error);
+                setPressedKeys(new Set());
+                return;
+              }
+            } catch {
+              setError("Validation failed");
+              setPressedKeys(new Set());
+              return;
+            }
+          }
+          setError(null);
+          onChange(singleKey);
+          setIsCapturing(false);
+          setPressedKeys(new Set());
+          return;
+        }
+      } else if (pressedKeys.size >= 2) {
         const pressed = Array.from(pressedKeys);
         const mods = pressed.filter((k) => MODIFIER_KEYS.has(k));
         const mainKeys = pressed.filter((k) => !MODIFIER_KEYS.has(k));

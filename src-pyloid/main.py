@@ -505,20 +505,20 @@ try:
         saved_rect = QRect(saved.window_x, saved.window_y, saved.window_width, saved.window_height)
         on_screen = any(
             screen.geometry().intersects(saved_rect)
-            for screen in app.screens()
+            for screen in QApplication.instance().screens()
         )
         if on_screen:
             w = max(saved.window_width, MIN_WINDOW_WIDTH)
             h = max(saved.window_height, MIN_WINDOW_HEIGHT)
-            window.set_size(w, h)
-            window.set_position(saved.window_x, saved.window_y)
+            qwindow.resize(w, h)
+            qwindow.move(saved.window_x, saved.window_y)
             restored = True
             log.info("Window geometry restored", width=w, height=h, x=saved.window_x, y=saved.window_y)
 
     if not restored:
         target_width = max(int(_screen_width * 0.8), MIN_WINDOW_WIDTH)
         target_height = max(int(_screen_height * 0.8), MIN_WINDOW_HEIGHT)
-        window.set_size(target_width, target_height)
+        qwindow.resize(target_width, target_height)
         log.info("Window geometry default", width=target_width, height=target_height)
 
 except Exception as e:

@@ -8,6 +8,7 @@ import type { HistoryEntry } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { base64ToBlobUrl, revokeUrl, isInvalidAudioPayload } from "@/lib/audio";
+import { formatHotkey } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,7 @@ export function HomePage() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioMeta, setAudioMeta] = useState<{ fileName?: string; mime?: string; durationMs?: number } | null>(null);
   const [loadingAudioFor, setLoadingAudioFor] = useState<number | null>(null);
+  const [activeHotkey, setActiveHotkey] = useState<string>("Ctrl+Win");
 
   useEffect(() => {
     const load = async () => {
@@ -41,6 +43,14 @@ export function HomePage() {
       }
     };
     load();
+
+    api.getSettings().then((s) => {
+      if (s.holdHotkeyEnabled && s.holdHotkey) {
+        setActiveHotkey(formatHotkey(s.holdHotkey));
+      } else if (s.toggleHotkeyEnabled && s.toggleHotkey) {
+        setActiveHotkey(formatHotkey(s.toggleHotkey));
+      }
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -204,7 +214,7 @@ export function HomePage() {
                 <p className="text-muted-foreground">
                   {searchQuery
                     ? "Try adjusting your search terms."
-                    : "Press Ctrl+Win to start your first dictation."}
+                    : `Press ${activeHotkey} to start your first dictation.`}
                 </p>
               </div>
             </div>
