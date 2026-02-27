@@ -53,6 +53,11 @@ class Settings:
     hold_hotkey_enabled: bool = True
     toggle_hotkey: str = "ctrl+shift+win"
     toggle_hotkey_enabled: bool = False
+    # Window geometry (None = use default)
+    window_width: Optional[int] = None
+    window_height: Optional[int] = None
+    window_x: Optional[int] = None
+    window_y: Optional[int] = None
 
 
 class SettingsService:
@@ -63,6 +68,10 @@ class SettingsService:
     def get_settings(self) -> Settings:
         if self._cache:
             return self._cache
+
+        def _opt_int(key: str) -> Optional[int]:
+            val = self.db.get_setting(key, "")
+            return int(val) if val else None
 
         settings = Settings(
             language=self.db.get_setting("language", "auto"),
@@ -79,6 +88,11 @@ class SettingsService:
             hold_hotkey_enabled=self.db.get_setting("hold_hotkey_enabled", "true") == "true",
             toggle_hotkey=self.db.get_setting("toggle_hotkey", "ctrl+shift+win"),
             toggle_hotkey_enabled=self.db.get_setting("toggle_hotkey_enabled", "false") == "true",
+            # Window geometry
+            window_width=_opt_int("window_width"),
+            window_height=_opt_int("window_height"),
+            window_x=_opt_int("window_x"),
+            window_y=_opt_int("window_y"),
         )
         self._cache = settings
         return settings
@@ -130,6 +144,17 @@ class SettingsService:
 
         self._cache = None  # Invalidate cache
         return self.get_settings()
+
+    def save_window_geometry(self, width: int, height: int, x: int, y: int) -> None:
+        self.db.set_setting("window_width", str(width))
+        self.db.set_setting("window_height", str(height))
+        self.db.set_setting("window_x", str(x))
+        self.db.set_setting("window_y", str(y))
+        if self._cache:
+            self._cache.window_width = width
+            self._cache.window_height = height
+            self._cache.window_x = x
+            self._cache.window_y = y
 
     def get_available_models(self) -> list:
         return WHISPER_MODELS

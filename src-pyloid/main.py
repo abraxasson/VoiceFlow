@@ -4,8 +4,9 @@ from pyloid.serve import pyloid_serve
 from pyloid import Pyloid
 import sys
 
-from PySide6.QtCore import QObject, Signal, Qt
+from PySide6.QtCore import QObject, Signal, Qt, QTimer, QRect
 from PySide6.QtWidgets import QWidget
+from PySide6.QtGui import QScreen
 
 from server import server, register_onboarding_complete_callback, register_data_reset_callback, register_window_actions, register_download_progress_callback
 from app_controller import get_controller
@@ -449,7 +450,7 @@ get_screen_info()
 # Window Control Functions
 def minimize_main_window():
     if window:
-        window._window._window.showMinimized()
+        window.hide()
 
 def toggle_maximize_main_window():
     if window:
@@ -487,26 +488,81 @@ else:
     #     error(f"Failed to set transparent background: {e}")
     window.load_url("http://localhost:5173")
 
-# Enforce Minimum Size Globally based on Screen Size
-try:
-    # Use cached screen info or default
-    target_width = int(_screen_width * 0.8)
-    target_height = int(_screen_height * 0.8)
-    
-    # Fallback if detection failed or is weird
-    if target_width < 1024: target_width = 1280
-    if target_height < 720: target_height = 800
+# Window sizing: set minimum, restore saved geometry or use 80% default
+MIN_WINDOW_WIDTH = 800
+MIN_WINDOW_HEIGHT = 600
 
+try:
     qwindow = window._window._window
-    # Set Minimum Size to ensure it never gets "small" as requested
-    qwindow.setMinimumSize(target_width, target_height)
-    
-    # Also set the initial size to this target
-    window.set_size(target_width, target_height)
-    
-    log.info("Window sizing forced", width=target_width, height=target_height)
+    qwindow.setMinimumSize(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
+
+    saved = controller.settings_service.get_settings()
+    restored = False
+
+    if (saved.window_width is not None and saved.window_height is not None
+            and saved.window_x is not None and saved.window_y is not None):
+        # Validate the saved geometry is on an available screen
+        saved_rect = QRect(saved.window_x, saved.window_y, saved.window_width, saved.window_height)
+        on_screen = any(
+            screen.geometry().intersects(saved_rect)
+            for screen in app.screens()
+        )
+        if on_screen:
+            w = max(saved.window_width, MIN_WINDOW_WIDTH)
+            h = max(saved.window_height, MIN_WINDOW_HEIGHT)
+            window.set_size(w, h)
+            window.set_position(saved.window_x, saved.window_y)
+            restored = True
+            log.info("Window geometry restored", width=w, height=h, x=saved.window_x, y=saved.window_y)
+
+    if not restored:
+        target_width = max(int(_screen_width * 0.8), MIN_WINDOW_WIDTH)
+        target_height = max(int(_screen_height * 0.8), MIN_WINDOW_HEIGHT)
+        window.set_size(target_width, target_height)
+        log.info("Window geometry default", width=target_width, height=target_height)
+
 except Exception as e:
     log.error("Failed to set window size constraints", error=str(e))
+
+
+# Debounced geometry saver — persists size/position 500ms after last change
+_geometry_save_timer = QTimer()
+_geometry_save_timer.setSingleShot(True)
+
+def _save_geometry():
+    try:
+        qwin = window._window._window
+        geo = qwin.geometry()
+        # Only save when window is in a normal (non-minimized, non-maximized) state
+        if not qwin.isMinimized() and not qwin.isMaximized():
+            controller.settings_service.save_window_geometry(
+                geo.width(), geo.height(), geo.x(), geo.y()
+            )
+            log.info("Window geometry saved", width=geo.width(), height=geo.height(),
+                     x=geo.x(), y=geo.y())
+    except Exception as e:
+        log.error("Failed to save window geometry", error=str(e))
+
+_geometry_save_timer.timeout.connect(_save_geometry)
+
+
+class WindowGeometryFilter(QObject):
+    """Event filter that persists geometry on resize/move and hides to tray on minimize."""
+    def eventFilter(self, obj, event):
+        from PySide6.QtCore import QEvent
+        if event.type() in (QEvent.Type.Resize, QEvent.Type.Move):
+            _geometry_save_timer.start(500)
+        elif event.type() == QEvent.Type.WindowStateChange:
+            if obj.isMinimized():
+                # Hide to tray instead of minimizing to taskbar
+                QTimer.singleShot(0, window.hide)
+        return False
+
+try:
+    _geo_filter = WindowGeometryFilter()
+    window._window._window.installEventFilter(_geo_filter)
+except Exception as e:
+    log.error("Failed to install geometry event filter", error=str(e))
 
 
 if onboarding_complete:
