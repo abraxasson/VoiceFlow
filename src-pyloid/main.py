@@ -25,7 +25,7 @@ class ThreadSafeSignals(QObject):
     recording_started = Signal()
     recording_stopped = Signal()
     transcription_complete = Signal(str)
-    amplitude_changed = Signal(float)
+    amplitude_changed = Signal(object)
 
 
 # Global signal emitter instance (created after QApplication)
@@ -145,8 +145,8 @@ from PySide6.QtWidgets import QApplication
 # Popup dimensions for different states
 POPUP_IDLE_WIDTH = 110
 POPUP_IDLE_HEIGHT = 18
-POPUP_ACTIVE_WIDTH = 280
-POPUP_ACTIVE_HEIGHT = 86
+POPUP_ACTIVE_WIDTH = 400
+POPUP_ACTIVE_HEIGHT = 92
 
 # Screen info cache (for active monitor)
 _screen_x = 0        # Monitor X offset
@@ -353,12 +353,12 @@ def send_main_window_event(name, detail):
         except Exception as e:
             log.error("Failed to send main window event", event=name, error=str(e))
 
-def _on_amplitude_slot(amp: float):
+def _on_amplitude_slot(data):
     """Slot: Actual amplitude handler - runs on main thread via signal."""
     # Send to popup if it exists
-    send_popup_event('amplitude', amp)
+    send_popup_event('amplitude', data)
     # Also send to main window (for onboarding mic test)
-    send_main_window_event('amplitude', amp)
+    send_main_window_event('amplitude', data)
 
 def on_amplitude(amp: float):
     """Called from audio thread - emits signal to main Qt thread."""

@@ -45,11 +45,11 @@ Python backend using Pyloid framework with PySide6:
 - **app_controller.py** - Singleton controller orchestrating all services. Handles hotkey activate/deactivate flow: start recording -> stop recording -> transcribe -> paste at cursor -> save to history.
 
 **Services (src-pyloid/services/):**
-- `audio.py` - Microphone recording using sounddevice, streams amplitude for visualizer
+- `audio.py` - Microphone recording using sounddevice. Computes 20 log-spaced FFT frequency bands (80–3500 Hz) with per-band EMA smoothing. Sends `[amplitude, band0..band19]` list to frontend for spectrum visualizer.
 - `transcription.py` - faster-whisper model loading and transcription
 - `hotkey.py` - Global hotkey listener using keyboard library
 - `clipboard.py` - Clipboard operations and paste-at-cursor using pyautogui
-- `settings.py` - Settings management with defaults
+- `settings.py` - Settings management with defaults. Includes `window_width/height/x/y` fields for geometry persistence and `save_window_geometry()` method.
 - `database.py` - SQLite database for settings and history (stored at ~/.VoiceFlow/VoiceFlow.db)
 - `logger.py` - Domain-based logging with hybrid format `[timestamp] [LEVEL] [domain] message | {json}`. Supports domains: model, audio, hotkey, settings, database, clipboard, window. Configured with 100MB log rotation.
 - `model_manager.py` - Whisper model download/cache management using huggingface_hub. Provides download progress tracking (percent, speed, ETA), cancellation via CancelToken, daemon thread execution, and `clear_cache()` to delete only VoiceFlow's faster-whisper models.
@@ -61,7 +61,7 @@ React 18 + TypeScript + Vite frontend:
 - **App.tsx** - Hash-based routing between `/popup`, `/onboarding`, and `/dashboard`. Checks model cache on startup and shows recovery modal if model is missing.
 - **lib/api.ts** - RPC wrapper using `pyloid-js` to call Python backend methods. Includes model management APIs (`getModelInfo`, `startModelDownload`, `cancelModelDownload`).
 - **lib/types.ts** - TypeScript interfaces for Settings, HistoryEntry, Stats, Options, ModelInfo, DownloadProgress
-- **pages/** - Popup (recording indicator), Onboarding (includes model download step), Dashboard
+- **pages/** - Popup (spectrum visualizer), Onboarding (includes model download step), Dashboard
 - **components/** - Feature components plus shadcn/ui components in `components/ui/`
   - `ModelDownloadProgress.tsx` - Download progress UI with progress bar, speed, ETA, and retry support
   - `ModelDownloadModal.tsx` - Dialog wrapper for model downloads triggered from settings
@@ -126,7 +126,11 @@ For transparent popup windows on Windows:
 - **Thread-safe signals**: Qt signals with `QueuedConnection` marshal UI updates from background threads to main thread
 - **Background threads**: Model loading, downloads, and transcription run in daemon threads
 - **Domain logging**: All services use `get_logger(domain)` for structured logging with domains like `model`, `audio`, `hotkey`, etc.
-- **Custom hotkeys**: Supports modifier-only combos (e.g., Ctrl+Win) and standard combos (e.g., Ctrl+R). Frontend captures keys, backend validates and registers.
+- **Custom hotkeys**: Supports modifier-only combos (e.g., Ctrl+Win), standard combos (e.g., Ctrl+R), and single function keys (F1–F12). Frontend captures keys, backend validates and registers.
+- **Window geometry persistence**: `save_window_geometry()` in `SettingsService` stores size/position in DB. Restored via direct `QMainWindow.resize()/move()` calls (not Pyloid wrappers) after `setWindowFlags()+show()` to avoid Windows position reset.
+- **Spectrum visualizer**: `audio.py` sends `[amplitude, band0..band19]` per audio chunk. `Popup.tsx` renders SVG catmull-rom waveform with warm→cool gradient. Popup positioned at top of screen; position set after `setWindowFlags()+show()`.
+- **Minimize to tray**: `WindowGeometryFilter` event filter intercepts `WindowStateChange`; minimized state triggers `window.hide()` via `QTimer.singleShot(0, ...)`.
+- **Pro Tip hotkey**: `Sidebar.tsx` re-fetches settings on every route change via `useLocation` so displayed hotkey stays current after settings changes.
 - **Path alias**: Frontend uses `@/` for `src/` imports (configured in tsconfig.json and vite.config.ts)
 
 ## Testing

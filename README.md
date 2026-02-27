@@ -11,10 +11,10 @@
 VoiceFlow brings OpenAI's Whisper directly to your Windows machine. Every word you speak is processed entirely on your hardware—your voice data never leaves your device. Built for privacy-conscious professionals who demand speed and reliability.
 
 <p align="center">
-  <a href="https://github.com/infiniV/VoiceFlow/releases/download/v1.3.1/VoiceFlowSetup-1.3.1.exe">
+  <a href="https://github.com/abraxasson/VoiceFlow/releases/download/v1.3.2/VoiceFlowSetup-1.3.2.exe">
     <img src="https://img.shields.io/badge/Download_for_Windows-000000?style=for-the-badge&logo=windows&logoColor=white" alt="Download">
   </a>
-  <a href="https://github.com/infiniV/VoiceFlow">
+  <a href="https://github.com/abraxasson/VoiceFlow">
     <img src="https://img.shields.io/badge/View_Source-000000?style=for-the-badge&logo=github&logoColor=white" alt="GitHub">
   </a>
 </p>
@@ -62,7 +62,7 @@ No hidden processes, no cloud uploads. Just transparent, local AI at every step.
 VoiceFlow waits silently in your system tray. A minimal popup indicates recording status.
 
 #### 2. Listening
-Activate with your hotkey and speak naturally. Audio stays in RAM only—the interface visualizes your voice amplitude in real-time.
+Activate with your hotkey and speak naturally. Audio stays in RAM only—a real-time spectrum visualizer at the top of your screen shows your voice across 20 frequency bands with a warm-to-cool color gradient.
 
 #### 3. Transcribe & Paste
 Release the hotkey. Local AI processes your audio instantly, then auto-pastes text at your cursor.
@@ -83,6 +83,7 @@ Configure your preferred keyboard shortcuts with two recording modes to match yo
 
 *   **Hold Mode**: Hold to record, release to transcribe. Perfect for quick dictation bursts.
 *   **Toggle Mode**: Press once to start, press again to stop. Ideal for longer recordings.
+*   **Function Keys**: Assign a single function key (F1–F12) as your hotkey — no modifier required.
 
 ---
 
@@ -98,9 +99,11 @@ Choose from 16+ Whisper models optimized for different use cases.
 
 #### Core Features
 *   **99+ Languages**: Automatic language detection built-in.
-*   **Custom Hotkeys**: Configure your own shortcuts with Hold or Toggle modes.
+*   **Custom Hotkeys**: Configure your own shortcuts with Hold or Toggle modes, including single function keys.
 *   **Local History**: Searchable SQLite database of all your transcriptions.
 *   **Auto-Paste**: Text appears directly at your cursor—no copy-paste needed.
+*   **Resizable Dashboard**: Window size and position are remembered across sessions.
+*   **Spectrum Visualizer**: Real-time frequency-band waveform with warm-to-cool gradient shown at the top of your screen while recording.
 
 ---
 
@@ -109,12 +112,12 @@ Choose from 16+ Whisper models optimized for different use cases.
 Take back control of your voice data. Open source and forever free.
 
 <p align="center">
-  <a href="https://github.com/infiniV/VoiceFlow/releases/download/v1.3.1/VoiceFlowSetup-1.3.1.exe">
+  <a href="https://github.com/abraxasson/VoiceFlow/releases/download/v1.3.2/VoiceFlowSetup-1.3.2.exe">
     <img src="media/footer.png" alt="Download Now" width="100%">
   </a>
 </p>
 
-### [Download Installer v1.3.1 (Windows)](https://github.com/infiniV/VoiceFlow/releases/download/v1.3.1/VoiceFlowSetup-1.3.1.exe)
+### [Download Installer v1.3.2 (Windows)](https://github.com/abraxasson/VoiceFlow/releases/download/v1.3.2/VoiceFlowSetup-1.3.2.exe)
 
 *Windows 10/11 • 64-bit • ~150MB*
 
@@ -131,7 +134,7 @@ Build and contribute to VoiceFlow.
 
 ```powershell
 # Clone and setup
-git clone https://github.com/infiniV/VoiceFlow.git
+git clone https://github.com/abraxasspm/VoiceFlow.git
 cd VoiceFlow
 pnpm run setup
 
@@ -151,4 +154,4 @@ pnpm run build:installer
 | **Frontend** | React 18, Vite, Tailwind CSS v4 |
 | **UI** | shadcn/ui, Lucide React |
 
-[Releases](https://github.com/infiniV/VoiceFlow/releases) • [Issues](https://github.com/infiniV/VoiceFlow/issues) • [License](LICENSE)
+[Releases](https://github.com/abraxas/VoiceFlow/releases) • [Issues](https://github.com/abraxas/VoiceFlow/issues) • [License](LICENSE)
