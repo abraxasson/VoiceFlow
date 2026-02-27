@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import sounddevice as sd
 from typing import Optional, Callable
@@ -20,6 +21,7 @@ class AudioService:
         self._stream: Optional[sd.InputStream] = None
         self._amplitude_callback: Optional[Callable[[float], None]] = None
         self._device_id: Optional[int] = None  # None = default device
+        self._smoothed_amplitude: float = 0.0
 
     def set_device(self, device_id: Optional[int]):
         """Set the input device to use. None for default."""
@@ -40,12 +42,14 @@ class AudioService:
 
         # Calculate amplitude for visualization using RMS (root mean square)
         if self._amplitude_callback:
-            # RMS gives better representation of perceived loudness
             rms = float(np.sqrt(np.mean(audio_chunk ** 2)))
-            # Scale to 0-1 range (typical speech RMS is 0.01-0.1 for float32)
-            # Multiply by 10 and clamp to make it more visible
-            amplitude = min(1.0, rms * 10)
-            self._amplitude_callback(amplitude)
+            # Logarithmic scaling for better perceptual response
+            # Quiet sounds get amplified, loud sounds are compressed
+            raw = min(1.0, math.log1p(rms * 60) / math.log1p(60))
+            # EMA smoothing: attack fast, decay slow for fluid animation
+            alpha = 0.6 if raw > self._smoothed_amplitude else 0.25
+            self._smoothed_amplitude = alpha * raw + (1 - alpha) * self._smoothed_amplitude
+            self._amplitude_callback(self._smoothed_amplitude)
 
     def start_recording(self):
         if self._recording:
@@ -78,6 +82,7 @@ class AudioService:
             return np.array([], dtype=self.DTYPE)
 
         self._recording = False
+        self._smoothed_amplitude = 0.0
 
         if self._stream:
             self._stream.stop()

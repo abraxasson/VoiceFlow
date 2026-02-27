@@ -145,8 +145,8 @@ from PySide6.QtWidgets import QApplication
 # Popup dimensions for different states
 POPUP_IDLE_WIDTH = 110
 POPUP_IDLE_HEIGHT = 18
-POPUP_ACTIVE_WIDTH = 190
-POPUP_ACTIVE_HEIGHT = 50
+POPUP_ACTIVE_WIDTH = 280
+POPUP_ACTIVE_HEIGHT = 86
 
 # Screen info cache (for active monitor)
 _screen_x = 0        # Monitor X offset
@@ -204,12 +204,6 @@ def resize_popup(width: int, height: int):
         # Resize the window
         popup_window.set_size(width, height)
 
-        # Recenter horizontally on active monitor, keep at bottom
-        # Use monitor offset (_screen_x, _screen_y) for multi-monitor support
-        popup_x = _screen_x + (_screen_width - width) // 2
-        popup_y = _screen_y + _screen_height - 100
-        popup_window.set_position(popup_x, popup_y)
-
         # Ensure stay-on-top is maintained after resize
         # Also prevent resizing and make non-focusable to reduce blinking
         qwindow = popup_window._window._window
@@ -224,6 +218,11 @@ def resize_popup(width: int, height: int):
         # Prevent window resizing
         qwindow.setFixedSize(width, height)
         qwindow.show()
+
+        # Position AFTER show — setWindowFlags resets position on Windows
+        popup_x = _screen_x + (_screen_width - width) // 2
+        popup_y = _screen_y + 16
+        qwindow.move(popup_x, popup_y)
     except Exception as e:
         log.error("Failed to resize popup", error=str(e))
 
@@ -267,12 +266,6 @@ def init_popup():
             else:
                 popup_window.load_url("http://localhost:5173#/popup")
 
-            # Position at bottom center of active monitor
-            # Use monitor offset (_screen_x, _screen_y) for multi-monitor support
-            popup_x = _screen_x + (_screen_width - POPUP_IDLE_WIDTH) // 2
-            popup_y = _screen_y + _screen_height - 100
-            popup_window.set_position(popup_x, popup_y)
-
             # Set window flags for stay-on-top and no taskbar icon
             # WindowDoesNotAcceptFocus prevents stealing focus and reduces blinking
             qwindow.setWindowFlags(
@@ -287,6 +280,11 @@ def init_popup():
 
             # Show the window
             popup_window.show()
+
+            # Position AFTER show — setWindowFlags resets position on Windows
+            popup_x = _screen_x + (_screen_width - POPUP_IDLE_WIDTH) // 2
+            popup_y = _screen_y + 16
+            qwindow.move(popup_x, popup_y)
             log.info("Popup window created and shown",
                      x=popup_x, y=popup_y,
                      monitor_offset_x=_screen_x, monitor_offset_y=_screen_y)
