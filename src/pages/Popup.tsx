@@ -241,10 +241,6 @@ function RingViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
   }, [hiBands, animTime, amplitude]);
 
   const barGlowStd = 3 + amplitude * 8;
-  // Rim glow: a wide blurred stroke at the disc edge, clipped to circle.
-  // Keeps all glow INSIDE the circle so the transparent popup area outside
-  // remains fully clear — no rectangular halo from glow spilling out.
-  const rimGlowStd = 6 + amplitude * 10;
 
   return (
     <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}
@@ -259,16 +255,6 @@ function RingViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
         <filter id="ringBloom" x="-40%" y="-40%" width="180%" height="180%">
           <feGaussianBlur stdDeviation={barGlowStd} result="b" />
           <feComposite in="b" in2="b" operator="arithmetic" k1="0" k2="2.0" k3="0" k4="0" result="bright" />
-          <feMerge>
-            <feMergeNode in="bright" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-
-        {/* Rim glow: blurred wide stroke at disc edge, stays inside clipPath */}
-        <filter id="rimGlow" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation={rimGlowStd} result="b" />
-          <feComposite in="b" in2="b" operator="arithmetic" k1="0" k2="1.8" k3="0" k4="0" result="bright" />
           <feMerge>
             <feMergeNode in="bright" />
             <feMergeNode in="SourceGraphic" />
@@ -295,15 +281,6 @@ function RingViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
         {/* Glass disc body */}
         <circle cx={CX} cy={CY_R} r={SIZE / 2} fill="url(#glassBg)" />
         <circle cx={CX} cy={CY_R} r={SIZE / 2} fill="url(#glassSpec)" />
-
-        {/* Rim glow — wide stroke at the disc edge blurred inward.
-            Creates the luminous circular border without leaking outside. */}
-        <circle cx={CX} cy={CY_R} r={SIZE / 2 - 7}
-          fill="none"
-          stroke={`hsla(270,90%,68%,${0.65 + amplitude * 0.35})`}
-          strokeWidth={16}
-          filter="url(#rimGlow)"
-        />
 
         {/* Bar glow layer */}
         <g filter="url(#ringBloom)" opacity={0.50 + amplitude * 0.45}>
