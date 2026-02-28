@@ -53,11 +53,16 @@ class Settings:
     hold_hotkey_enabled: bool = True
     toggle_hotkey: str = "ctrl+shift+win"
     toggle_hotkey_enabled: bool = False
+    # Visualizer style
+    visualizer_style: str = "multiwave"  # "multiwave", "ring", "bar"
     # Window geometry (None = use default)
     window_width: Optional[int] = None
     window_height: Optional[int] = None
     window_x: Optional[int] = None
     window_y: Optional[int] = None
+    # Popup position (None = use default centered-top)
+    popup_x: Optional[int] = None
+    popup_y: Optional[int] = None
 
 
 class SettingsService:
@@ -88,11 +93,15 @@ class SettingsService:
             hold_hotkey_enabled=self.db.get_setting("hold_hotkey_enabled", "true") == "true",
             toggle_hotkey=self.db.get_setting("toggle_hotkey", "ctrl+shift+win"),
             toggle_hotkey_enabled=self.db.get_setting("toggle_hotkey_enabled", "false") == "true",
+            # Visualizer style
+            visualizer_style=self.db.get_setting("visualizer_style", "multiwave"),
             # Window geometry
             window_width=_opt_int("window_width"),
             window_height=_opt_int("window_height"),
             window_x=_opt_int("window_x"),
             window_y=_opt_int("window_y"),
+            popup_x=_opt_int("popup_x"),
+            popup_y=_opt_int("popup_y"),
         )
         self._cache = settings
         return settings
@@ -113,6 +122,7 @@ class SettingsService:
         hold_hotkey_enabled: Optional[bool] = None,
         toggle_hotkey: Optional[str] = None,
         toggle_hotkey_enabled: Optional[bool] = None,
+        visualizer_style: Optional[str] = None,
     ) -> Settings:
         if language is not None:
             self.db.set_setting("language", language)
@@ -141,9 +151,18 @@ class SettingsService:
             self.db.set_setting("toggle_hotkey", normalize_hotkey(toggle_hotkey))
         if toggle_hotkey_enabled is not None:
             self.db.set_setting("toggle_hotkey_enabled", "true" if toggle_hotkey_enabled else "false")
+        if visualizer_style is not None:
+            self.db.set_setting("visualizer_style", visualizer_style)
 
         self._cache = None  # Invalidate cache
         return self.get_settings()
+
+    def save_popup_position(self, x: int, y: int) -> None:
+        self.db.set_setting("popup_x", str(x))
+        self.db.set_setting("popup_y", str(y))
+        if self._cache:
+            self._cache.popup_x = x
+            self._cache.popup_y = y
 
     def save_window_geometry(self, width: int, height: int, x: int, y: int) -> None:
         self.db.set_setting("window_width", str(width))

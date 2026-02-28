@@ -49,6 +49,27 @@ MODEL_SIZES = {
     "distil-large-v3": 1_510_000_000,  # ~1.51 GB
 }
 
+# Approximate RAM usage when model is loaded (in MB)
+# CPU mode (int8): roughly 1.5–2x disk size; GPU mode (float16): similar to disk size
+MODEL_RAM_MB = {
+    "tiny":            420,
+    "base":            620,
+    "small":           1_100,
+    "medium":          3_000,
+    "large-v1":        6_200,
+    "large-v2":        6_200,
+    "large-v3":        6_200,
+    "turbo":           3_300,
+    "tiny.en":         420,
+    "base.en":         620,
+    "small.en":        1_100,
+    "medium.en":       3_000,
+    "distil-small.en": 700,
+    "distil-medium.en":1_500,
+    "distil-large-v2": 3_100,
+    "distil-large-v3": 3_100,
+}
+
 # Model name to HuggingFace repo ID mapping
 # Based on faster-whisper's internal mapping
 MODEL_REPOS = {

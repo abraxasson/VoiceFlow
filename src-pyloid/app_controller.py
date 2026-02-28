@@ -47,7 +47,7 @@ class AppController:
         self._on_recording_start: Optional[Callable[[], None]] = None
         self._on_recording_stop: Optional[Callable[[], None]] = None
         self._on_transcription_complete: Optional[Callable[[str], None]] = None
-        self._on_amplitude: Optional[Callable[[list], None]] = None
+        self._on_amplitude: Optional[Callable[[dict], None]] = None
         self._on_error: Optional[Callable[[str], None]] = None
 
         # Setup hotkey callbacks
@@ -64,7 +64,7 @@ class AppController:
         on_recording_start: Callable[[], None] = None,
         on_recording_stop: Callable[[], None] = None,
         on_transcription_complete: Callable[[str], None] = None,
-        on_amplitude: Callable[[list], None] = None,
+        on_amplitude: Callable[[dict], None] = None,
         on_error: Callable[[str], None] = None,
     ):
         self._on_recording_start = on_recording_start
@@ -234,6 +234,7 @@ class AppController:
             "holdHotkeyEnabled": settings.hold_hotkey_enabled,
             "toggleHotkey": settings.toggle_hotkey,
             "toggleHotkeyEnabled": settings.toggle_hotkey_enabled,
+            "visualizerStyle": settings.visualizer_style,
         }
 
     def update_settings(self, **kwargs) -> dict:
@@ -255,6 +256,8 @@ class AppController:
             mapped["toggle_hotkey"] = kwargs["toggleHotkey"]
         if "toggleHotkeyEnabled" in kwargs:
             mapped["toggle_hotkey_enabled"] = kwargs["toggleHotkeyEnabled"]
+        if "visualizerStyle" in kwargs:
+            mapped["visualizer_style"] = kwargs["visualizerStyle"]
 
         for key in ["language", "model", "device", "retention", "theme", "microphone"]:
             if key in kwargs:

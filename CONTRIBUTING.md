@@ -14,7 +14,7 @@ Thanks for your interest in contributing to VoiceFlow!
 
 ```bash
 # Clone the repo
-git clone https://github.com/infiniV/VoiceFlow.git
+git clone https://github.com/abraxasson/VoiceFlow.git
 cd VoiceFlow
 
 # Install dependencies (Node + Python)

@@ -43,3 +43,5 @@ docs/plans/
 *.spec
 build_error_log.txt
 
+# Input files not to share
+tips

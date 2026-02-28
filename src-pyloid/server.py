@@ -14,6 +14,20 @@ server = PyloidRPC()
 _on_onboarding_complete = None
 _on_data_reset = None
 _send_download_progress = None  # Callback to send progress to frontend
+_on_visualizer_style_changed = None  # Callback when user changes visualizer style
+_on_start_popup_drag = None           # Callback to initiate native window drag
+
+
+def register_visualizer_style_callback(callback):
+    """Register callback to be called when visualizer style changes."""
+    global _on_visualizer_style_changed
+    _on_visualizer_style_changed = callback
+
+
+def register_popup_drag_callback(callback):
+    """Register callback to initiate native popup window drag."""
+    global _on_start_popup_drag
+    _on_start_popup_drag = callback
 
 # Active download state
 _active_download_token: CancelToken = None
@@ -60,6 +74,7 @@ async def update_settings(
     holdHotkeyEnabled: Optional[bool] = None,
     toggleHotkey: Optional[str] = None,
     toggleHotkeyEnabled: Optional[bool] = None,
+    visualizerStyle: Optional[str] = None,
 ):
     controller = get_controller()
     kwargs = {}
@@ -90,6 +105,8 @@ async def update_settings(
         kwargs["toggleHotkey"] = toggleHotkey
     if toggleHotkeyEnabled is not None:
         kwargs["toggleHotkeyEnabled"] = toggleHotkeyEnabled
+    if visualizerStyle is not None:
+        kwargs["visualizerStyle"] = visualizerStyle
 
     # Check if onboarding was already complete before this update
     old_settings = controller.get_settings()
@@ -101,6 +118,10 @@ async def update_settings(
     if onboardingComplete is True and not was_onboarding_complete and _on_onboarding_complete:
         log.info("Onboarding completed, initializing popup")
         _on_onboarding_complete()
+
+    # Notify popup if visualizer style changed
+    if visualizerStyle is not None and _on_visualizer_style_changed:
+        _on_visualizer_style_changed(visualizerStyle)
 
     return result
 
@@ -474,3 +495,65 @@ async def clear_model_cache():
     manager = get_model_manager()
     result = manager.clear_cache()
     return result
+
+
+@server.method()
+async def get_model_storage_info():
+    """Get model storage path and disk usage information."""
+    from pathlib import Path
+    from services.model_manager import MODEL_REPOS, MODEL_RAM_MB
+
+    cache_dir = Path.home() / ".cache" / "huggingface" / "hub"
+    total_size_mb = 0.0
+    models = []
+
+    for model_name, repo_id in MODEL_REPOS.items():
+        cache_folder = f"models--{repo_id.replace('/', '--')}"
+        model_path = cache_dir / cache_folder
+        if model_path.exists():
+            size = sum(f.stat().st_size for f in model_path.rglob("*") if f.is_file())
+            size_mb = round(size / (1024 * 1024), 1)
+            total_size_mb += size_mb
+            models.append({
+                "name": model_name,
+                "sizeMb": size_mb,
+                "cached": True,
+                "ramMb": MODEL_RAM_MB.get(model_name, 0),
+            })
+
+    return {
+        "path": str(cache_dir),
+        "totalSizeMb": round(total_size_mb, 1),
+        "models": models,
+    }
+
+
+@server.method()
+async def start_popup_drag():
+    """Initiate native window drag for the popup via Win32 API."""
+    if _on_start_popup_drag:
+        _on_start_popup_drag()
+    return {"success": True}
+
+
+@server.method()
+async def open_model_folder():
+    """Open the HuggingFace model cache directory in the system file manager."""
+    import sys
+    import subprocess
+    import os
+    from pathlib import Path
+
+    cache_dir = Path.home() / ".cache" / "huggingface" / "hub"
+    try:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        if sys.platform == "win32":
+            os.startfile(str(cache_dir))
+        elif sys.platform == "darwin":
+            subprocess.run(["open", str(cache_dir)], check=True)
+        else:
+            subprocess.run(["xdg-open", str(cache_dir)], check=True)
+        return {"success": True}
+    except Exception as e:
+        log.error("Failed to open model folder", error=str(e))
+        return {"success": False, "error": str(e)}

@@ -4,7 +4,7 @@
 #define MyAppName "VoiceFlow"
 #define MyAppVersion "1.3.2"
 #define MyAppPublisher "VoiceFlow"
-#define MyAppURL "https://github.com/your-repo/voiceflow"
+#define MyAppURL "https://github.com/abraxasson/voiceflow"
 #define MyAppExeName "VoiceFlow.exe"
 
 [Setup]

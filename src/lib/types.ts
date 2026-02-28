@@ -13,6 +13,14 @@ export interface Settings {
   holdHotkeyEnabled: boolean;
   toggleHotkey: string;
   toggleHotkeyEnabled: boolean;
+  // Visualizer style
+  visualizerStyle: string;
+}
+
+export interface ModelStorageInfo {
+  path: string;
+  totalSizeMb: number;
+  models: Array<{ name: string; sizeMb: number; cached: boolean; ramMb: number }>;
 }
 
 export interface HistoryEntry {
