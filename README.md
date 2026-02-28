@@ -134,7 +134,7 @@ Build and contribute to VoiceFlow.
 
 ```powershell
 # Clone and setup
-git clone https://github.com/abraxasspm/VoiceFlow.git
+git clone https://github.com/abraxasson/VoiceFlow.git
 cd VoiceFlow
 pnpm run setup
 
@@ -154,4 +154,4 @@ pnpm run build:installer
 | **Frontend** | React 18, Vite, Tailwind CSS v4 |
 | **UI** | shadcn/ui, Lucide React |
 
-[Releases](https://github.com/abraxas/VoiceFlow/releases) • [Issues](https://github.com/abraxas/VoiceFlow/issues) • [License](LICENSE)
+[Releases](https://github.com/abraxasson/VoiceFlow/releases) • [Issues](https://github.com/abraxasson/VoiceFlow/issues) • [License](LICENSE)
