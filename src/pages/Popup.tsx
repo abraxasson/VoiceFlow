@@ -240,73 +240,73 @@ function RingViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
     });
   }, [hiBands, animTime, amplitude]);
 
-  const glowStd = 3 + amplitude * 8;
+  const barGlowStd = 3 + amplitude * 8;
+  // Rim glow: a wide blurred stroke at the disc edge, clipped to circle.
+  // Keeps all glow INSIDE the circle so the transparent popup area outside
+  // remains fully clear — no rectangular halo from glow spilling out.
+  const rimGlowStd = 6 + amplitude * 10;
 
   return (
-    <div style={{ position: "relative", width: SIZE, height: SIZE, cursor: "grab" }}>
+    <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}
+      style={{ cursor: "grab", display: "block" }}>
+      <defs>
+        {/* Hard circular clip — nothing escapes the circle boundary */}
+        <clipPath id="ringClip">
+          <circle cx={CX} cy={CY_R} r={SIZE / 2 - 0.5} />
+        </clipPath>
 
-      {/* Glass disc — real OS backdrop blur via CSS clip-path circle */}
-      <div style={{
-        position: "absolute",
-        inset: 0,
-        borderRadius: "50%",
-        // Frosted glass: blurs whatever is behind the transparent Qt window
-        backdropFilter: "blur(18px) saturate(160%) brightness(0.55)",
-        WebkitBackdropFilter: "blur(18px) saturate(160%) brightness(0.55)",
-        // Semi-transparent deep-purple tint over the blur
-        background: [
-          "radial-gradient(ellipse at 38% 28%, rgba(90,60,200,0.30) 0%, transparent 65%)",
-          "radial-gradient(ellipse at 62% 72%, rgba(40,20,120,0.25) 0%, transparent 60%)",
-          "radial-gradient(ellipse at 50% 50%, rgba(15,8,45,0.55) 0%, rgba(5,2,20,0.70) 100%)",
-        ].join(", "),
-        // Glass rim: thin bright top-edge highlight + outer glow ring
-        boxShadow: [
-          `0 0 ${18 + amplitude * 35}px rgba(140,80,255,${0.20 + amplitude * 0.35})`,
-          "inset 0 1px 0 rgba(255,255,255,0.18)",
-          "inset 0 -1px 0 rgba(0,0,0,0.30)",
-          "inset 0 0 0 1px rgba(160,120,255,0.18)",
-        ].join(", "),
-      }}>
-        {/* Top-left light refraction highlight */}
-        <div style={{
-          position: "absolute",
-          top: "8%", left: "12%",
-          width: "40%", height: "30%",
-          borderRadius: "50%",
-          background: "radial-gradient(ellipse, rgba(255,255,255,0.09) 0%, transparent 70%)",
-          transform: "rotate(-20deg)",
-          pointerEvents: "none",
-        }} />
-      </div>
+        {/* Bloom for bars */}
+        <filter id="ringBloom" x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation={barGlowStd} result="b" />
+          <feComposite in="b" in2="b" operator="arithmetic" k1="0" k2="2.0" k3="0" k4="0" result="bright" />
+          <feMerge>
+            <feMergeNode in="bright" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
 
-      {/* SVG bars — rendered on top of the glass disc */}
-      <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}
-        style={{ position: "absolute", inset: 0 }}>
-        <defs>
-          <filter id="ringBloom" x="-40%" y="-40%" width="180%" height="180%">
-            <feGaussianBlur stdDeviation={glowStd} result="b" />
-            <feComposite in="b" in2="b" operator="arithmetic" k1="0" k2="2.0" k3="0" k4="0" result="bright" />
-            <feMerge>
-              <feMergeNode in="bright" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-          {/* Clip to circle so bar glow doesn't bleed outside the disc */}
-          <clipPath id="ringClip">
-            <circle cx={CX} cy={CY_R} r={SIZE / 2 - 1} />
-          </clipPath>
-        </defs>
+        {/* Rim glow: blurred wide stroke at disc edge, stays inside clipPath */}
+        <filter id="rimGlow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation={rimGlowStd} result="b" />
+          <feComposite in="b" in2="b" operator="arithmetic" k1="0" k2="1.8" k3="0" k4="0" result="bright" />
+          <feMerge>
+            <feMergeNode in="bright" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
 
-        {/* Inner ring glow */}
-        <circle cx={CX} cy={CY_R} r={INNER_R - 1}
+        {/* Glass body: dark semi-transparent with off-centre gradient for depth */}
+        <radialGradient id="glassBg" cx="42%" cy="35%" r="68%">
+          <stop offset="0%"   stopColor="rgba(55,30,130,0.52)" />
+          <stop offset="55%"  stopColor="rgba(14,7,45,0.68)" />
+          <stop offset="100%" stopColor="rgba(4,2,18,0.80)" />
+        </radialGradient>
+
+        {/* Specular highlight: top-left light catch */}
+        <radialGradient id="glassSpec" cx="32%" cy="24%" r="38%">
+          <stop offset="0%"   stopColor="rgba(255,255,255,0.16)" />
+          <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+        </radialGradient>
+      </defs>
+
+      {/* Every element inside the clipPath — nothing leaks outside the circle */}
+      <g clipPath="url(#ringClip)">
+
+        {/* Glass disc body */}
+        <circle cx={CX} cy={CY_R} r={SIZE / 2} fill="url(#glassBg)" />
+        <circle cx={CX} cy={CY_R} r={SIZE / 2} fill="url(#glassSpec)" />
+
+        {/* Rim glow — wide stroke at the disc edge blurred inward.
+            Creates the luminous circular border without leaking outside. */}
+        <circle cx={CX} cy={CY_R} r={SIZE / 2 - 7}
           fill="none"
-          stroke={`hsla(200, 100%, 75%, ${0.10 + amplitude * 0.25})`}
-          strokeWidth={1 + amplitude * 2.5}
-          filter="url(#ringBloom)"
+          stroke={`hsla(270,90%,68%,${0.65 + amplitude * 0.35})`}
+          strokeWidth={16}
+          filter="url(#rimGlow)"
         />
 
-        {/* Glow layer clipped to circle */}
-        <g filter="url(#ringBloom)" opacity={0.50 + amplitude * 0.45} clipPath="url(#ringClip)">
+        {/* Bar glow layer */}
+        <g filter="url(#ringBloom)" opacity={0.50 + amplitude * 0.45}>
           {bars.map((b, i) => (
             <line key={`rg${i}`} x1={b.x1} y1={b.y1} x2={b.x2} y2={b.y2}
               stroke={b.color} strokeWidth={3.5} strokeLinecap="round" />
@@ -321,14 +321,36 @@ function RingViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
           />
         ))}
 
-        {/* Inner ring accent */}
+        {/* Inner ring glow + accent */}
         <circle cx={CX} cy={CY_R} r={INNER_R - 1}
           fill="none"
-          stroke={`hsla(270, 90%, 75%, ${0.20 + amplitude * 0.35})`}
+          stroke={`hsla(200,100%,75%,${0.10 + amplitude * 0.25})`}
+          strokeWidth={1 + amplitude * 2.5}
+          filter="url(#ringBloom)"
+        />
+        <circle cx={CX} cy={CY_R} r={INNER_R - 1}
+          fill="none"
+          stroke={`hsla(270,90%,75%,${0.20 + amplitude * 0.35})`}
           strokeWidth={0.8}
         />
-      </svg>
-    </div>
+
+        {/* Glass rim line */}
+        <circle cx={CX} cy={CY_R} r={SIZE / 2 - 1}
+          fill="none"
+          stroke="rgba(160,120,255,0.22)"
+          strokeWidth={1.5}
+        />
+
+        {/* Top specular arc — inside clip, sits at the circle edge */}
+        <path
+          d={`M ${(CX + Math.cos(-Math.PI * 0.85) * (SIZE / 2 - 2)).toFixed(1)} ${(CY_R + Math.sin(-Math.PI * 0.85) * (SIZE / 2 - 2)).toFixed(1)} A ${SIZE / 2 - 2} ${SIZE / 2 - 2} 0 0 1 ${(CX + Math.cos(-Math.PI * 0.15) * (SIZE / 2 - 2)).toFixed(1)} ${(CY_R + Math.sin(-Math.PI * 0.15) * (SIZE / 2 - 2)).toFixed(1)}`}
+          fill="none"
+          stroke="rgba(255,255,255,0.25)"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+        />
+      </g>
+    </svg>
   );
 }
 
@@ -553,10 +575,16 @@ export function Popup() {
     }
   };
 
+  // For ring style, clip the entire viewport to a circle so no rectangular
+  // artefacts from SVG filter bleed or Qt compositing are visible.
+  const containerClip = vizStyle === "ring" && state === "recording"
+    ? "circle(50%)"
+    : undefined;
+
   return (
     <div
       className="w-screen h-screen flex items-center justify-center select-none"
-      style={{ background: "transparent" }}
+      style={{ background: "transparent", clipPath: containerClip }}
       onMouseDown={handleMouseDown}
     >
       {/* IDLE: invisible tiny pill (popup is hidden at idle anyway) */}
