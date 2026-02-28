@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { Onboarding } from "@/pages/Onboarding";
 import { Dashboard } from "@/pages/Dashboard";
@@ -78,6 +78,17 @@ function AppRouter() {
   const handleRecoveryComplete = useCallback(() => {
     setModelMissing(false);
   }, []);
+
+  // Listen for backend navigation events (e.g. tray "Settings" click)
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (isPopupRoute) return;
+    const handleNavigate = (e: CustomEvent<{ path: string }>) => {
+      navigate(e.detail.path);
+    };
+    document.addEventListener("navigate" as any, handleNavigate);
+    return () => document.removeEventListener("navigate" as any, handleNavigate);
+  }, [isPopupRoute, navigate]);
 
   // For popup, render immediately with no loading state
   if (isPopupRoute) {

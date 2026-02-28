@@ -24,9 +24,11 @@ import {
   Hand,
   ToggleRight,
   HardDrive,
+  Activity,
+  Database,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import type { Settings, Options, GpuInfo } from "@/lib/types";
+import type { Settings, Options, GpuInfo, ModelStorageInfo } from "@/lib/types";
 import { ModelDownloadModal } from "./ModelDownloadModal";
 import { HotkeyCapture } from "./HotkeyCapture";
 import {
@@ -464,7 +466,37 @@ export function SettingsTab() {
             </div>
           </BentoSettingCard>
 
-          {/* 8. Keyboard Shortcuts (Full Width) */}
+          {/* 9. Voice Visualizer (Span 4) */}
+          <BentoSettingCard
+            title="Voice Visualizer"
+            description="Recording animation style"
+            icon={Activity}
+            className="md:col-span-6 lg:col-span-4"
+          >
+            <div className="mt-auto grid grid-cols-3 gap-2">
+              {[
+                { id: "multiwave", label: "Wave" },
+                { id: "ring",      label: "Ring" },
+                { id: "bar",       label: "Equalizer" },
+              ].map((viz) => (
+                <button
+                  key={viz.id}
+                  onClick={() => updateSetting("visualizerStyle", viz.id)}
+                  className={cn(
+                    "flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all",
+                    settings.visualizerStyle === viz.id
+                      ? "border-primary/60 bg-primary/10 text-primary"
+                      : "border-border/40 bg-secondary/20 hover:bg-secondary/40 text-muted-foreground"
+                  )}
+                >
+                  <VizMiniPreview style={viz.id} />
+                  <span className="text-[10px] font-medium">{viz.label}</span>
+                </button>
+              ))}
+            </div>
+          </BentoSettingCard>
+
+          {/* 11. Keyboard Shortcuts (Full Width) */}
           <BentoSettingCard
             title="Keyboard Shortcuts"
             description="Customize recording hotkeys"
@@ -614,7 +646,10 @@ export function SettingsTab() {
             )}
           </BentoSettingCard>
 
-          {/* 10. Danger Zone (Span 4) */}
+          {/* Model Storage (Span 6) */}
+          <ModelStorageCard />
+
+          {/* Danger Zone (Span 4) */}
           <DangerZoneCard />
         </div>
       </div>
@@ -673,6 +708,165 @@ function BentoSettingCard({
       </div>
       <div className="flex-grow flex flex-col justify-end">{children}</div>
     </div>
+  );
+}
+
+// VISUALIZER MINI PREVIEW
+function VizMiniPreview({ style }: { style: string }) {
+  if (style === "ring") {
+    // Dense radial bars around circle, cyan→purple→magenta
+    return (
+      <svg width={44} height={44} viewBox="0 0 44 44">
+        {Array.from({ length: 24 }, (_, i) => {
+          const angle = (i / 24) * Math.PI * 2 - Math.PI / 2;
+          const val = 0.3 + Math.abs(Math.sin(i * 0.8 + 0.5)) * 0.7;
+          const innerR = 8, outerR = innerR + val * 12;
+          const x1 = 22 + Math.cos(angle) * innerR;
+          const y1 = 22 + Math.sin(angle) * innerR;
+          const x2 = 22 + Math.cos(angle) * outerR;
+          const y2 = 22 + Math.sin(angle) * outerR;
+          const normA = ((angle + Math.PI / 2) / (Math.PI * 2) + 1) % 1;
+          const hue = 190 + normA * 130;
+          return (
+            <line key={i} x1={x1} y1={y1} x2={x2} y2={y2}
+              stroke={`hsl(${hue},90%,60%)`} strokeWidth={1.5} strokeLinecap="round" />
+          );
+        })}
+      </svg>
+    );
+  }
+  if (style === "bar") {
+    // Bars with wave lines overlay, rainbow colors
+    const heights = [4, 7, 11, 14, 12, 13, 10, 14, 9, 5];
+    const colors = ["#00ff80","#00e0ff","#2080ff","#6040ff","#c020ff",
+                    "#ff20a0","#ff4040","#ff8020","#ffc020","#ffe040"];
+    return (
+      <svg width={44} height={44} viewBox="0 0 44 44">
+        {heights.map((h, i) => (
+          <g key={i}>
+            <rect x={2 + i * 4} y={22 - h} width={3} height={h} fill={colors[i]} rx={1} opacity={0.7} />
+            <rect x={2 + i * 4} y={22} width={3} height={h} fill={colors[i]} rx={1} opacity={0.7} />
+          </g>
+        ))}
+        {/* Wave overlay lines */}
+        <path d="M2,16 C8,10 16,26 22,18 C28,10 36,24 42,15" stroke="url(#mpg)" strokeWidth="0.8" fill="none" opacity="0.6" />
+        <path d="M2,28 C8,34 16,18 22,26 C28,34 36,20 42,29" stroke="url(#mpg)" strokeWidth="0.8" fill="none" opacity="0.6" />
+        <defs>
+          <linearGradient id="mpg" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0%" stopColor="#00ff80" /><stop offset="50%" stopColor="#8020ff" /><stop offset="100%" stopColor="#ffc020" />
+          </linearGradient>
+        </defs>
+      </svg>
+    );
+  }
+  // multiwave: multiple flowing lines with rainbow gradient
+  return (
+    <svg width={44} height={44} viewBox="0 0 44 44">
+      <defs>
+        <linearGradient id="mwpg" x1="0" x2="1" y1="0" y2="0">
+          <stop offset="0%" stopColor="#ffb020" /><stop offset="25%" stopColor="#00e8d0" />
+          <stop offset="50%" stopColor="#20a0ff" /><stop offset="75%" stopColor="#e040a0" />
+          <stop offset="100%" stopColor="#ff3030" />
+        </linearGradient>
+      </defs>
+      {[0, 1, 2, 3, 4, 5].map((li) => {
+        const off = li * 1.2;
+        const s = 1.0 - li * 0.12;
+        return (
+          <g key={li} opacity={0.3 + (1 - li / 5) * 0.55}>
+            <path d={`M2,${22 - off} C8,${14 - off * s} 14,${30 - off * s} 22,${22 - off} C30,${14 - off * s} 36,${30 - off * s} 42,${22 - off}`}
+              stroke="url(#mwpg)" strokeWidth={1.8 - li * 0.2} fill="none" />
+            <path d={`M2,${22 + off} C8,${30 + off * s} 14,${14 + off * s} 22,${22 + off} C30,${30 + off * s} 36,${14 + off * s} 42,${22 + off}`}
+              stroke="url(#mwpg)" strokeWidth={1.8 - li * 0.2} fill="none" />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// MODEL STORAGE CARD
+function ModelStorageCard() {
+  const [storageInfo, setStorageInfo] = useState<ModelStorageInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.getModelStorageInfo()
+      .then(setStorageInfo)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const sizeFmt = (mb: number) =>
+    mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb.toFixed(0)} MB`;
+
+  return (
+    <BentoSettingCard
+      title="Model Storage"
+      description="Cached Whisper models — disk size and estimated RAM when loaded"
+      icon={Database}
+      className="md:col-span-6 lg:col-span-6"
+    >
+      <div className="mt-auto space-y-3">
+        {loading ? (
+          <div className="h-24 rounded-xl bg-secondary/30 animate-pulse" />
+        ) : storageInfo ? (
+          <>
+            {/* Summary row */}
+            <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
+              <span>{storageInfo.models.length} model{storageInfo.models.length !== 1 ? "s" : ""} cached</span>
+              <span>Total on disk: <span className="font-medium text-foreground">{sizeFmt(storageInfo.totalSizeMb)}</span></span>
+            </div>
+
+            {/* Per-model list */}
+            {storageInfo.models.length > 0 ? (
+              <div className="space-y-1.5 max-h-52 overflow-y-auto pr-0.5">
+                {storageInfo.models.map((m) => (
+                  <div key={m.name}
+                    className="flex items-center gap-3 px-3 py-2 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors"
+                  >
+                    {/* Model name */}
+                    <span className="font-mono text-xs font-semibold text-foreground min-w-[90px]">
+                      {m.name}
+                    </span>
+
+                    {/* Disk size badge */}
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-background/60 border border-border/40 text-muted-foreground whitespace-nowrap">
+                      Disk: {sizeFmt(m.sizeMb)}
+                    </span>
+
+                    {/* RAM bar */}
+                    <div className="flex-1 flex items-center gap-1.5 min-w-0">
+                      <div className="flex-1 h-1.5 rounded-full bg-secondary overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-primary/70 transition-all"
+                          style={{ width: `${Math.min(100, (m.ramMb / 6200) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                        ~{sizeFmt(m.ramMb)} RAM
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-2">No models downloaded yet</p>
+            )}
+
+            <button
+              onClick={() => api.openModelFolder()}
+              className="w-full flex items-center justify-center gap-2 h-10 rounded-xl border border-border/50 bg-background/50 hover:bg-primary/5 hover:border-primary/30 hover:text-primary transition-all text-sm font-medium text-muted-foreground"
+            >
+              <FolderOpen className="w-4 h-4" />
+              Open Models Folder
+            </button>
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">Unable to load storage info</p>
+        )}
+      </div>
+    </BentoSettingCard>
   );
 }
 

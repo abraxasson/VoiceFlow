@@ -1,25 +1,53 @@
-import { useEffect, useState, useLayoutEffect, useRef } from "react";
+import { useEffect, useState, useLayoutEffect, useRef, useMemo } from "react";
+import { api } from "@/lib/api";
 
 type PopupState = "idle" | "recording" | "processing";
+type VisualizerStyle = "multiwave" | "ring" | "bar";
+
+interface AudioData {
+  amplitude: number;
+  bands: number[];
+  samples: number[];
+}
 
 const N_BANDS = 20;
+const EMPTY_AUDIO: AudioData = {
+  amplitude: 0,
+  bands: Array(N_BANDS).fill(0),
+  samples: Array(64).fill(0),
+};
 
-// SVG canvas dimensions (popup minus padding)
-const SVG_W = 364;
-const SVG_H = 68;
-const CY = SVG_H / 2;          // center Y
-const MAX_H = CY * 0.96;       // max wave excursion in pixels
+// ---- Shared utilities ----
 
-// Warm → cool gradient matching the reference (left = low freq, right = high freq)
-const GRAD_STOPS = [
-  { pct: "0%",   color: "#ffd000" },
-  { pct: "18%",  color: "#ff8800" },
-  { pct: "36%",  color: "#ff2800" },
-  { pct: "54%",  color: "#0060ff" },
-  { pct: "72%",  color: "#00aaff" },
-  { pct: "88%",  color: "#00e4ff" },
-  { pct: "100%", color: "#4466ff" },
-];
+/** Power-curve boost with stronger lift for mid-range values */
+function boost(v: number): number {
+  return Math.min(1.0, Math.pow(v * 1.6, 0.55));
+}
+
+/** Interpolate N_BANDS values to a higher resolution using cubic interpolation */
+function interpolateBands(bands: number[], targetCount: number): number[] {
+  const result: number[] = [];
+  const n = bands.length;
+  for (let i = 0; i < targetCount; i++) {
+    const t = (i / (targetCount - 1)) * (n - 1);
+    const idx = Math.floor(t);
+    const frac = t - idx;
+    // Catmull-Rom style interpolation
+    const p0 = bands[Math.max(0, idx - 1)];
+    const p1 = bands[idx];
+    const p2 = bands[Math.min(n - 1, idx + 1)];
+    const p3 = bands[Math.min(n - 1, idx + 2)];
+    const v = p1 + 0.5 * frac * (
+      p2 - p0 + frac * (
+        2 * p0 - 5 * p1 + 4 * p2 - p3 + frac * (
+          3 * (p1 - p2) + p3 - p0
+        )
+      )
+    );
+    result.push(Math.max(0, Math.min(1, v)));
+  }
+  return result;
+}
 
 /** Catmull-Rom spline → SVG cubic bezier path */
 function crPath(pts: Array<[number, number]>): string {
@@ -40,45 +68,475 @@ function crPath(pts: Array<[number, number]>): string {
   return d;
 }
 
-/** Build closed area path: upper wave → reversed lower wave */
-function areaPath(upper: Array<[number, number]>, lower: Array<[number, number]>): string {
-  const rev = [...lower].reverse();
-  return crPath(upper) +
-    ` L ${rev[0][0].toFixed(1)} ${rev[0][1].toFixed(1)}` +
-    crPath(rev).replace(/^M[\d. ]+/, "") +
-    " Z";
+/** HSL color helper */
+function hsl(h: number, s: number, l: number, a = 1): string {
+  return a < 1
+    ? `hsla(${h.toFixed(0)},${s.toFixed(0)}%,${l.toFixed(0)}%,${a.toFixed(2)})`
+    : `hsl(${h.toFixed(0)},${s.toFixed(0)}%,${l.toFixed(0)}%)`;
 }
 
+// ============================================================================
+// STYLE 1 — Multi-Wave: Flowing ribbon mesh (reference: layered flowing waves
+// with gold→green→cyan→blue→red color shift, 10+ parallel lines, glow bloom)
+// ============================================================================
+const MW_LINES = 12;       // Number of parallel wave lines per half
+const MW_HIRES = 48;       // Interpolated band count for smoother curves
+
+function MultiWaveViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
+  const SVG_W = 460;
+  const SVG_H = 86;
+  const CY = SVG_H / 2;
+  const MAX_H = CY * 0.92;
+  const { amplitude, bands } = audio;
+
+  // Interpolate 20 bands → 48 points for smoother curves
+  const hiBands = useMemo(() => interpolateBands(bands, MW_HIRES), [bands]);
+
+  // Gradient: gold → green → cyan → blue → indigo → magenta → red
+  const gradStops = useMemo(() => [
+    { offset: "0%",   color: "#ffb020" },  // gold
+    { offset: "15%",  color: "#40e860" },   // green
+    { offset: "35%",  color: "#00e8d0" },   // cyan-green
+    { offset: "50%",  color: "#20a0ff" },   // blue
+    { offset: "70%",  color: "#6040ff" },   // indigo
+    { offset: "85%",  color: "#e040a0" },   // magenta
+    { offset: "100%", color: "#ff3030" },   // red
+  ], []);
+
+  // Generate wave line points for a single line
+  function wavePts(lineIdx: number, upper: boolean): Array<[number, number]> {
+    const lineT = lineIdx / (MW_LINES - 1); // 0..1 across lines
+    const phaseOff = lineT * Math.PI * 0.8;
+    const scaleMultiplier = 1.0 - lineT * 0.55; // outer lines are biggest, inner smallest
+
+    return hiBands.map((v, i) => {
+      const pos = i / (MW_HIRES - 1);
+      // Multi-frequency idle breathing
+      const idle =
+        (Math.sin(animTime * 2.4 + pos * Math.PI * 3.2 + phaseOff) * 0.30 +
+         Math.sin(animTime * 1.3 + pos * Math.PI * 6.0 + 1.5 + phaseOff) * 0.35 +
+         Math.sin(animTime * 3.8 + pos * Math.PI * 2.5 - 0.6 + phaseOff) * 0.20 +
+         Math.sin(animTime * 5.2 + pos * Math.PI * 4.5 + 2.8 + phaseOff * 0.7) * 0.15) *
+        0.5 + 0.5;
+      const boosted = boost(v);
+      const val = Math.max(idle * 0.04, boosted) * scaleMultiplier;
+      // Add per-line vertical offset for ribbon depth
+      const ribbonShift = (lineT - 0.5) * 3.5;
+      const y = upper
+        ? CY - val * MAX_H + ribbonShift
+        : CY + val * MAX_H - ribbonShift;
+      return [pos * SVG_W, y] as [number, number];
+    });
+  }
+
+  const glowStd = 4 + amplitude * 10;
+
+  return (
+    <div style={{
+      padding: "10px 8px",
+      borderRadius: "24px",
+      background: "#000000",
+      boxShadow: `0 0 ${20 + amplitude * 40}px rgba(80, 180, 255, ${0.15 + amplitude * 0.45})`,
+      cursor: "grab",
+    }}>
+      <svg width={SVG_W} height={SVG_H} viewBox={`0 0 ${SVG_W} ${SVG_H}`} overflow="visible"
+        style={{ display: "block" }}>
+        <defs>
+          <linearGradient id="mwGrad" x1="0" x2="1" y1="0" y2="0">
+            {gradStops.map((s) => (
+              <stop key={s.offset} offset={s.offset} stopColor={s.color} />
+            ))}
+          </linearGradient>
+          <filter id="mwBloom" x="-15%" y="-60%" width="130%" height="220%">
+            <feGaussianBlur stdDeviation={glowStd} result="b" />
+            <feComposite in="b" in2="b" operator="arithmetic" k1="0" k2="1.5" k3="0" k4="0" result="bright" />
+            <feMerge>
+              <feMergeNode in="bright" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        {/* Glow layer: fewer lines, blurred, for bloom effect */}
+        <g filter="url(#mwBloom)" opacity={0.5 + amplitude * 0.4}>
+          {[0, 3, 6, 9, 11].map((li) => {
+            const upD = crPath(wavePts(li, true));
+            const dnD = crPath(wavePts(li, false));
+            return (
+              <g key={`glow${li}`}>
+                <path d={upD} stroke="url(#mwGrad)" strokeWidth={2.5} fill="none" />
+                <path d={dnD} stroke="url(#mwGrad)" strokeWidth={2.5} fill="none" />
+              </g>
+            );
+          })}
+        </g>
+
+        {/* Crisp line mesh: all lines rendered sharply */}
+        {Array.from({ length: MW_LINES }, (_, li) => {
+          const lineT = li / (MW_LINES - 1);
+          const opacity = 0.3 + (1 - Math.abs(lineT - 0.5) * 2) * 0.55 + amplitude * 0.15;
+          const sw = 0.8 + (1 - lineT) * 1.0;
+          const upD = crPath(wavePts(li, true));
+          const dnD = crPath(wavePts(li, false));
+          return (
+            <g key={`line${li}`} opacity={Math.min(1, opacity)}>
+              <path d={upD} stroke="url(#mwGrad)" strokeWidth={sw} fill="none" />
+              <path d={dnD} stroke="url(#mwGrad)" strokeWidth={sw} fill="none" />
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+
+// ============================================================================
+// STYLE 2 — Ring: Dense radial bars around a circle
+// (reference: 60+ bars, cyan→purple→magenta gradient, strong glow bloom)
+// ============================================================================
+const RING_BAR_COUNT = 72;
+
+function RingViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
+  const SIZE = 148;
+  const CX = SIZE / 2;
+  const CY_R = SIZE / 2;
+  const INNER_R = 34;
+  const MAX_BAR_LEN = 30;
+  const { amplitude, bands } = audio;
+
+  // Interpolate 20 bands → 72 bars
+  const hiBands = useMemo(() => interpolateBands(bands, RING_BAR_COUNT), [bands]);
+
+  const bars = useMemo(() => {
+    return hiBands.map((v, i) => {
+      const pos = i / RING_BAR_COUNT;
+      // Idle breathing per bar
+      const idle =
+        (Math.sin(animTime * 2.0 + pos * Math.PI * 6.0) * 0.35 +
+         Math.sin(animTime * 3.2 + pos * Math.PI * 3.5 + 1.4) * 0.30 +
+         Math.sin(animTime * 1.6 + pos * Math.PI * 8.0 - 0.5) * 0.20 +
+         Math.sin(animTime * 4.5 + pos * Math.PI * 5.0 + 2.1) * 0.15) *
+        0.5 + 0.5;
+      const val = Math.max(idle * 0.04, boost(v));
+      const barLen = val * MAX_BAR_LEN;
+      const angle = pos * Math.PI * 2 - Math.PI / 2;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const x1 = CX + cos * INNER_R;
+      const y1 = CY_R + sin * INNER_R;
+      const x2 = CX + cos * (INNER_R + barLen);
+      const y2 = CY_R + sin * (INNER_R + barLen);
+
+      // Color: cyan at top → blue at sides → purple at bottom-sides → magenta at bottom
+      // Map angle (-PI/2 = top) to hue
+      const normAngle = ((angle + Math.PI / 2) / (Math.PI * 2) + 1) % 1; // 0=top, 0.5=bottom
+      const hue = 190 + normAngle * 130; // 190 (cyan) → 320 (magenta)
+      const sat = 85 + amplitude * 15;
+      const lit = 50 + val * 20 + amplitude * 10;
+      const color = hsl(hue % 360, Math.min(100, sat), Math.min(80, lit));
+
+      return { x1, y1, x2, y2, color, val };
+    });
+  }, [hiBands, animTime, amplitude]);
+
+  const glowStd = 3 + amplitude * 8;
+
+  return (
+    <div style={{ position: "relative", width: SIZE, height: SIZE, cursor: "grab" }}>
+
+      {/* Glass disc — real OS backdrop blur via CSS clip-path circle */}
+      <div style={{
+        position: "absolute",
+        inset: 0,
+        borderRadius: "50%",
+        // Frosted glass: blurs whatever is behind the transparent Qt window
+        backdropFilter: "blur(18px) saturate(160%) brightness(0.55)",
+        WebkitBackdropFilter: "blur(18px) saturate(160%) brightness(0.55)",
+        // Semi-transparent deep-purple tint over the blur
+        background: [
+          "radial-gradient(ellipse at 38% 28%, rgba(90,60,200,0.30) 0%, transparent 65%)",
+          "radial-gradient(ellipse at 62% 72%, rgba(40,20,120,0.25) 0%, transparent 60%)",
+          "radial-gradient(ellipse at 50% 50%, rgba(15,8,45,0.55) 0%, rgba(5,2,20,0.70) 100%)",
+        ].join(", "),
+        // Glass rim: thin bright top-edge highlight + outer glow ring
+        boxShadow: [
+          `0 0 ${18 + amplitude * 35}px rgba(140,80,255,${0.20 + amplitude * 0.35})`,
+          "inset 0 1px 0 rgba(255,255,255,0.18)",
+          "inset 0 -1px 0 rgba(0,0,0,0.30)",
+          "inset 0 0 0 1px rgba(160,120,255,0.18)",
+        ].join(", "),
+      }}>
+        {/* Top-left light refraction highlight */}
+        <div style={{
+          position: "absolute",
+          top: "8%", left: "12%",
+          width: "40%", height: "30%",
+          borderRadius: "50%",
+          background: "radial-gradient(ellipse, rgba(255,255,255,0.09) 0%, transparent 70%)",
+          transform: "rotate(-20deg)",
+          pointerEvents: "none",
+        }} />
+      </div>
+
+      {/* SVG bars — rendered on top of the glass disc */}
+      <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}
+        style={{ position: "absolute", inset: 0 }}>
+        <defs>
+          <filter id="ringBloom" x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation={glowStd} result="b" />
+            <feComposite in="b" in2="b" operator="arithmetic" k1="0" k2="2.0" k3="0" k4="0" result="bright" />
+            <feMerge>
+              <feMergeNode in="bright" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          {/* Clip to circle so bar glow doesn't bleed outside the disc */}
+          <clipPath id="ringClip">
+            <circle cx={CX} cy={CY_R} r={SIZE / 2 - 1} />
+          </clipPath>
+        </defs>
+
+        {/* Inner ring glow */}
+        <circle cx={CX} cy={CY_R} r={INNER_R - 1}
+          fill="none"
+          stroke={`hsla(200, 100%, 75%, ${0.10 + amplitude * 0.25})`}
+          strokeWidth={1 + amplitude * 2.5}
+          filter="url(#ringBloom)"
+        />
+
+        {/* Glow layer clipped to circle */}
+        <g filter="url(#ringBloom)" opacity={0.50 + amplitude * 0.45} clipPath="url(#ringClip)">
+          {bars.map((b, i) => (
+            <line key={`rg${i}`} x1={b.x1} y1={b.y1} x2={b.x2} y2={b.y2}
+              stroke={b.color} strokeWidth={3.5} strokeLinecap="round" />
+          ))}
+        </g>
+
+        {/* Crisp bars */}
+        {bars.map((b, i) => (
+          <line key={`rc${i}`} x1={b.x1} y1={b.y1} x2={b.x2} y2={b.y2}
+            stroke={b.color} strokeWidth={2} strokeLinecap="round"
+            opacity={0.85 + b.val * 0.15}
+          />
+        ))}
+
+        {/* Inner ring accent */}
+        <circle cx={CX} cy={CY_R} r={INNER_R - 1}
+          fill="none"
+          stroke={`hsla(270, 90%, 75%, ${0.20 + amplitude * 0.35})`}
+          strokeWidth={0.8}
+        />
+      </svg>
+    </div>
+  );
+}
+
+
+// ============================================================================
+// STYLE 3 — Bar Equalizer with wave mesh overlay
+// (reference: vertical bars with 10+ overlapping sinusoidal wave lines,
+// full rainbow coloring green→cyan→blue→magenta→orange, mesh interference)
+// ============================================================================
+const BAR_COUNT = 28;
+const WAVE_LINES = 14;
+
+// Rainbow colors for bars: green → cyan → blue → purple → magenta → orange → gold
+function barColor(pos: number): string {
+  const hue = 140 - pos * 280; // 140 (green) → -140 → wraps to 220 (warm)
+  const h = ((hue % 360) + 360) % 360;
+  return hsl(h, 95, 55);
+}
+
+function BarViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
+  const SVG_W = 460;
+  const SVG_H = 86;
+  const CY = SVG_H / 2;
+  const MAX_H = CY * 0.92;
+  const { amplitude, bands } = audio;
+
+  // Interpolate 20 bands → 28 for denser bars
+  const hiBands = useMemo(() => interpolateBands(bands, BAR_COUNT), [bands]);
+
+  const BAR_W = 12;
+  const GAP = (SVG_W - BAR_COUNT * BAR_W) / (BAR_COUNT - 1);
+
+  const barData = useMemo(() => {
+    return hiBands.map((v, i) => {
+      const pos = i / (BAR_COUNT - 1);
+      const idle =
+        (Math.sin(animTime * 2.2 + pos * Math.PI * 4.0) * 0.35 +
+         Math.sin(animTime * 1.4 + pos * Math.PI * 6.5 + 0.8) * 0.30 +
+         Math.sin(animTime * 3.5 + pos * Math.PI * 2.5 - 1.0) * 0.20 +
+         Math.sin(animTime * 5.0 + pos * Math.PI * 3.0 + 2.5) * 0.15) *
+        0.5 + 0.5;
+      const val = Math.max(idle * 0.04, boost(v));
+      const h = Math.max(1.5, val * MAX_H);
+      const x = i * (BAR_W + GAP);
+      const color = barColor(pos);
+      return { x, h, val, color, pos };
+    });
+  }, [hiBands, animTime, amplitude]);
+
+  // Generate wave mesh lines that flow through the bars
+  function waveLinePts(lineIdx: number, upper: boolean): Array<[number, number]> {
+    const lineT = lineIdx / (WAVE_LINES - 1);
+    const phaseOff = lineT * Math.PI * 0.6;
+    const yScale = 0.3 + lineT * 0.7; // inner lines smaller, outer bigger
+
+    return barData.map((b) => {
+      const pos = b.pos;
+      const wave =
+        (Math.sin(animTime * 2.8 + pos * Math.PI * 3.5 + phaseOff) * 0.35 +
+         Math.sin(animTime * 1.5 + pos * Math.PI * 7.0 + 1.2 + phaseOff) * 0.30 +
+         Math.sin(animTime * 4.2 + pos * Math.PI * 2.0 - 0.8 + phaseOff * 1.5) * 0.20 +
+         Math.sin(animTime * 6.0 + pos * Math.PI * 5.0 + 3.0 + phaseOff * 0.5) * 0.15) *
+        0.5 + 0.5;
+      const val = Math.max(wave * 0.06, b.val) * yScale;
+      const y = upper
+        ? CY - val * MAX_H + (lineT - 0.5) * 2
+        : CY + val * MAX_H - (lineT - 0.5) * 2;
+      return [b.x + BAR_W / 2, y] as [number, number];
+    });
+  }
+
+  const glowStd = 3 + amplitude * 8;
+
+  return (
+    <div style={{
+      padding: "10px 8px",
+      borderRadius: "24px",
+      background: "#000000",
+      boxShadow: `0 0 ${20 + amplitude * 40}px rgba(100, 50, 255, ${0.15 + amplitude * 0.40})`,
+      cursor: "grab",
+    }}>
+      <svg width={SVG_W} height={SVG_H} viewBox={`0 0 ${SVG_W} ${SVG_H}`} overflow="visible"
+        style={{ display: "block" }}>
+        <defs>
+          <filter id="barBloom" x="-15%" y="-40%" width="130%" height="180%">
+            <feGaussianBlur stdDeviation={glowStd} result="b" />
+            <feComposite in="b" in2="b" operator="arithmetic" k1="0" k2="1.5" k3="0" k4="0" result="bright" />
+            <feMerge>
+              <feMergeNode in="bright" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <linearGradient id="barWaveGrad" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0%"   stopColor="#00ff80" />
+            <stop offset="20%"  stopColor="#00e0ff" />
+            <stop offset="40%"  stopColor="#2080ff" />
+            <stop offset="60%"  stopColor="#8020ff" />
+            <stop offset="75%"  stopColor="#ff20a0" />
+            <stop offset="90%"  stopColor="#ff8020" />
+            <stop offset="100%" stopColor="#ffc020" />
+          </linearGradient>
+        </defs>
+
+        {/* Bar glow layer */}
+        <g filter="url(#barBloom)" opacity={0.4 + amplitude * 0.4}>
+          {barData.map((b, i) => (
+            <g key={`bg${i}`}>
+              <rect x={b.x} y={CY - b.h} width={BAR_W} height={b.h}
+                fill={b.color} rx={1.5} />
+              <rect x={b.x} y={CY} width={BAR_W} height={b.h}
+                fill={b.color} rx={1.5} />
+            </g>
+          ))}
+        </g>
+
+        {/* Crisp bars */}
+        {barData.map((b, i) => (
+          <g key={`bc${i}`} opacity={0.75 + b.val * 0.25}>
+            <rect x={b.x} y={CY - b.h} width={BAR_W} height={b.h}
+              fill={b.color} rx={1.5} />
+            <rect x={b.x} y={CY} width={BAR_W} height={b.h}
+              fill={b.color} rx={1.5} />
+          </g>
+        ))}
+
+        {/* Wave mesh overlay: multiple sinusoidal lines threading through bars */}
+        {Array.from({ length: WAVE_LINES }, (_, li) => {
+          const lineT = li / (WAVE_LINES - 1);
+          const opacity = 0.15 + (1 - Math.abs(lineT - 0.5) * 2) * 0.45 + amplitude * 0.2;
+          const sw = 0.6 + (1 - Math.abs(lineT - 0.5) * 2) * 0.8;
+          const upD = crPath(waveLinePts(li, true));
+          const dnD = crPath(waveLinePts(li, false));
+          return (
+            <g key={`wl${li}`} opacity={Math.min(0.9, opacity)}>
+              <path d={upD} stroke="url(#barWaveGrad)" strokeWidth={sw} fill="none" />
+              <path d={dnD} stroke="url(#barWaveGrad)" strokeWidth={sw} fill="none" />
+            </g>
+          );
+        })}
+
+        {/* Bright peak connecting lines */}
+        <path d={crPath(barData.map(b => [b.x + BAR_W / 2, CY - b.h]))}
+          stroke="rgba(255,255,255,0.7)" strokeWidth={1.2} fill="none"
+          opacity={0.5 + amplitude * 0.4} />
+        <path d={crPath(barData.map(b => [b.x + BAR_W / 2, CY + b.h]))}
+          stroke="rgba(255,255,255,0.7)" strokeWidth={1.2} fill="none"
+          opacity={0.5 + amplitude * 0.4} />
+      </svg>
+    </div>
+  );
+}
+
+
+// ============================================================================
+// Main Popup Component
+// ============================================================================
 export function Popup() {
   const [state, setState] = useState<PopupState>("idle");
-  // data[0] = overall amplitude, data[1..N_BANDS] = spectrum bands
-  const [data, setData] = useState<number[]>(Array(N_BANDS + 1).fill(0));
+  const [vizStyle, setVizStyle] = useState<VisualizerStyle>("multiwave");
+  const [audio, setAudio] = useState<AudioData>(EMPTY_AUDIO);
   const [animTime, setAnimTime] = useState(0);
   const rafRef = useRef<number>(0);
 
   useLayoutEffect(() => {
+    // Override all backgrounds and the noise texture overlay from index.css
+    const styleEl = document.createElement("style");
+    styleEl.id = "popup-transparency";
+    styleEl.textContent = `
+      html, body, #root { background: transparent !important; }
+      body::before, body::after { display: none !important; }
+    `;
+    document.head.appendChild(styleEl);
     document.documentElement.style.cssText = "background: transparent !important;";
     document.body.style.cssText = "background: transparent !important; margin: 0; padding: 0;";
-    document.documentElement.classList.add("popup-transparent");
     const root = document.getElementById("root");
     if (root) root.style.cssText = "background: transparent !important;";
+    return () => styleEl.remove();
+  }, []);
+
+  // Load initial visualizer style from settings
+  useEffect(() => {
+    api.getSettings().then((s) => {
+      if (s.visualizerStyle) setVizStyle(s.visualizerStyle as VisualizerStyle);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
-    const handleAmplitude = (e: CustomEvent<number[]>) => setData(e.detail);
+    const handleAmplitude = (e: CustomEvent<AudioData>) => setAudio(e.detail);
     const handleState = (e: CustomEvent<{ state: PopupState }>) => setState(e.detail.state);
+    const handleStyle = (e: CustomEvent<{ style: string }>) =>
+      setVizStyle(e.detail.style as VisualizerStyle);
 
     document.addEventListener("amplitude" as any, handleAmplitude);
     document.addEventListener("popup-state" as any, handleState);
+    document.addEventListener("visualizer-style" as any, handleStyle);
     return () => {
       document.removeEventListener("amplitude" as any, handleAmplitude);
       document.removeEventListener("popup-state" as any, handleState);
+      document.removeEventListener("visualizer-style" as any, handleStyle);
     };
   }, []);
 
-  // rAF loop — always runs while recording for idle wave blending
+  // rAF loop for animation timing
   useEffect(() => {
-    if (state !== "recording") { cancelAnimationFrame(rafRef.current); return; }
+    if (state !== "recording") {
+      cancelAnimationFrame(rafRef.current);
+      return;
+    }
     let startTs: number | null = null;
     const tick = (ts: number) => {
       if (startTs === null) startTs = ts;
@@ -89,141 +547,59 @@ export function Popup() {
     return () => cancelAnimationFrame(rafRef.current);
   }, [state]);
 
-  const amplitude = data[0] ?? 0;
-  const rawBands = data.slice(1);
-
-  // Blend spectrum with a gentle idle animation so bars always move
-  const bands = rawBands.map((v, i) => {
-    const pos = i / (N_BANDS - 1);
-    const idle =
-      (Math.sin(animTime * 2.8 + pos * Math.PI * 3.0) * 0.35 +
-       Math.sin(animTime * 1.5 + pos * Math.PI * 5.5 + 1.3) * 0.40 +
-       Math.sin(animTime * 4.1 + pos * Math.PI * 2.2 - 0.9) * 0.25) *
-      0.5 + 0.5; // 0..1
-    const idleFloor = idle * 0.14;
-    return Math.max(idleFloor, v);
-  });
-
-  // Compute upper and lower wave point arrays
-  const upperPts: Array<[number, number]> = bands.map((v, i) => [
-    (i / (N_BANDS - 1)) * SVG_W,
-    CY - v * MAX_H,
-  ]);
-  const lowerPts: Array<[number, number]> = bands.map((v, i) => [
-    (i / (N_BANDS - 1)) * SVG_W,
-    CY + v * MAX_H,
-  ]);
-
-  const upperD = crPath(upperPts);
-  const lowerD = crPath(lowerPts);
-  const fillD  = areaPath(upperPts, lowerPts);
-
-  const glowStrength = 2 + amplitude * 5;
-  const containerGlow = [
-    `0 0 ${12 + amplitude * 22}px rgba(120, 160, 255, ${0.15 + amplitude * 0.3})`,
-    `0 4px 24px rgba(0,0,0,0.55)`,
-    `inset 0 0 0 1px rgba(180, 160, 255, ${0.1 + amplitude * 0.18})`,
-  ].join(", ");
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button === 0) {
+      api.startPopupDrag().catch(() => {});
+    }
+  };
 
   return (
     <div
       className="w-screen h-screen flex items-center justify-center select-none"
       style={{ background: "transparent" }}
+      onMouseDown={handleMouseDown}
     >
-      {/* IDLE: Tiny pill */}
+      {/* IDLE: invisible tiny pill (popup is hidden at idle anyway) */}
       {state === "idle" && (
-        <div style={{ width: "32px", height: "4px", borderRadius: "2px", background: "rgba(255,255,255,0.15)" }} />
+        <div style={{
+          width: "28px", height: "3px", borderRadius: "2px",
+          background: "rgba(255,255,255,0.12)",
+        }} />
       )}
 
-      {/* RECORDING: Spectrum wave */}
+      {/* RECORDING: Visualizer */}
       {state === "recording" && (
-        <div
-          style={{
-            padding: "10px 18px",
-            borderRadius: "26px",
-            background: "rgba(4, 6, 18, 0.82)",
-            backdropFilter: "blur(20px)",
-            boxShadow: containerGlow,
-          }}
-        >
-          <svg
-            width={SVG_W}
-            height={SVG_H}
-            viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-            overflow="visible"
-          >
-            <defs>
-              <linearGradient id="wg" x1="0" x2="1" y1="0" y2="0">
-                {GRAD_STOPS.map((s) => (
-                  <stop key={s.pct} offset={s.pct} stopColor={s.color} />
-                ))}
-              </linearGradient>
-
-              {/* Glow filter */}
-              <filter id="glow" x="-20%" y="-40%" width="140%" height="180%">
-                <feGaussianBlur stdDeviation={glowStrength} result="blur" />
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-            </defs>
-
-            {/* Filled area — subtle */}
-            <path
-              d={fillD}
-              fill="url(#wg)"
-              opacity={0.1 + amplitude * 0.18}
-            />
-
-            {/* Lower wave — glow layer */}
-            <path d={lowerD} stroke="url(#wg)" strokeWidth="1.5" fill="none"
-              opacity={0.35 + amplitude * 0.35} filter="url(#glow)" />
-
-            {/* Upper wave — glow layer */}
-            <path d={upperD} stroke="url(#wg)" strokeWidth="1.5" fill="none"
-              opacity={0.35 + amplitude * 0.35} filter="url(#glow)" />
-
-            {/* Lower wave — sharp layer */}
-            <path d={lowerD} stroke="url(#wg)" strokeWidth="1.5" fill="none"
-              opacity={0.7 + amplitude * 0.3} />
-
-            {/* Upper wave — sharp layer */}
-            <path d={upperD} stroke="url(#wg)" strokeWidth="1.5" fill="none"
-              opacity={0.7 + amplitude * 0.3} />
-
-            {/* Center line — thin, always visible */}
-            <line
-              x1="0" y1={CY} x2={SVG_W} y2={CY}
-              stroke="url(#wg)" strokeWidth="0.5"
-              opacity={0.25 + amplitude * 0.2}
-            />
-          </svg>
-        </div>
+        <>
+          {vizStyle === "ring" && <RingViz audio={audio} animTime={animTime} />}
+          {vizStyle === "bar" && <BarViz audio={audio} animTime={animTime} />}
+          {(vizStyle === "multiwave" || !["ring", "bar"].includes(vizStyle)) && (
+            <MultiWaveViz audio={audio} animTime={animTime} />
+          )}
+        </>
       )}
 
-      {/* PROCESSING: Three dots */}
+      {/* PROCESSING: Animated dots */}
       {state === "processing" && (
         <div style={{
-          display: "flex", alignItems: "center", gap: "4px",
-          padding: "8px 12px", borderRadius: "12px",
-          background: "rgba(0,0,0,0.5)", backdropFilter: "blur(12px)",
+          display: "flex", alignItems: "center", gap: "5px",
+          padding: "8px 14px", borderRadius: "14px",
+          background: "#000000",
         }}>
           {[0, 1, 2].map((i) => (
             <div key={i} style={{
-              width: "4px", height: "4px", borderRadius: "50%",
-              background: "rgba(255,255,255,0.7)",
-              animation: "fade 1s ease-in-out infinite",
-              animationDelay: `${i * 0.2}s`,
+              width: "5px", height: "5px", borderRadius: "50%",
+              background: "rgba(180,200,255,0.8)",
+              animation: "dotspin 1s ease-in-out infinite",
+              animationDelay: `${i * 0.22}s`,
             }} />
           ))}
         </div>
       )}
 
       <style>{`
-        @keyframes fade {
-          0%, 100% { opacity: 0.3; }
-          50%       { opacity: 1; }
+        @keyframes dotspin {
+          0%, 100% { opacity: 0.2; transform: scale(0.75); }
+          50%       { opacity: 1;   transform: scale(1.1); }
         }
       `}</style>
     </div>

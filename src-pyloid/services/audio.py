@@ -58,8 +58,8 @@ class AudioService:
         if self._amplitude_callback:
             # --- Overall amplitude (for glow / container brightness) ---
             rms = float(np.sqrt(np.mean(audio_chunk ** 2)))
-            raw_amp = min(1.0, math.log1p(rms * 90) / math.log1p(90))
-            a = 0.6 if raw_amp > self._smoothed_amplitude else 0.25
+            raw_amp = min(1.0, math.log1p(rms * 120) / math.log1p(120))
+            a = 0.80 if raw_amp > self._smoothed_amplitude else 0.45
             self._smoothed_amplitude = a * raw_amp + (1 - a) * self._smoothed_amplitude
 
             # --- Spectrum bands via FFT ---
@@ -68,15 +68,25 @@ class AudioService:
             raw_bands = np.zeros(N_BANDS, dtype=np.float64)
             for i, (lo, hi) in enumerate(self._band_bins):
                 band_mag = float(np.mean(fft_mag[lo:hi]))
-                raw_bands[i] = min(1.0, math.log1p(band_mag * 140) / math.log1p(140))
+                raw_bands[i] = min(1.0, math.log1p(band_mag * 220) / math.log1p(220))
 
-            # Per-band EMA: fast attack, slow decay
-            alpha = np.where(raw_bands > self._smoothed_bands, 0.72, 0.2)
+            # Per-band EMA: fast attack, moderate decay for dynamic response
+            alpha = np.where(raw_bands > self._smoothed_bands, 0.92, 0.45)
             self._smoothed_bands = alpha * raw_bands + (1 - alpha) * self._smoothed_bands
 
-            # Send [overall_amplitude, band0, ..., band19]
-            data = [round(self._smoothed_amplitude, 3)] + \
-                   [round(float(v), 3) for v in self._smoothed_bands]
+            # Downsample 1024 samples → 64 points (avg blocks of 16)
+            chunk = audio_chunk[:1024]
+            if len(chunk) >= 64:
+                samples_ds = chunk[:64 * 16].reshape(64, 16).mean(axis=1)
+                samples = [round(float(v), 4) for v in samples_ds]
+            else:
+                samples = [0.0] * 64
+
+            data = {
+                "amplitude": round(self._smoothed_amplitude, 3),
+                "bands": [round(float(v), 3) for v in self._smoothed_bands],
+                "samples": samples,
+            }
             self._amplitude_callback(data)
 
     def start_recording(self):

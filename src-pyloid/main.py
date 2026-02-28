@@ -8,7 +8,7 @@ from PySide6.QtCore import QObject, Signal, Qt, QTimer, QRect
 from PySide6.QtWidgets import QWidget
 from PySide6.QtGui import QScreen
 
-from server import server, register_onboarding_complete_callback, register_data_reset_callback, register_window_actions, register_download_progress_callback
+from server import server, register_onboarding_complete_callback, register_data_reset_callback, register_window_actions, register_download_progress_callback, register_visualizer_style_callback, register_popup_drag_callback
 from app_controller import get_controller
 from services.logger import setup_logging, get_logger
 
@@ -26,6 +26,7 @@ class ThreadSafeSignals(QObject):
     recording_stopped = Signal()
     transcription_complete = Signal(str)
     amplitude_changed = Signal(object)
+    visualizer_style_changed = Signal(str)
 
 
 # Global signal emitter instance (created after QApplication)
@@ -121,7 +122,8 @@ def show_dashboard():
 
 def open_settings():
     app.show_and_focus_main_window()
-    # Frontend will handle showing settings tab via URL hash or event
+    # Tell frontend to navigate to settings tab
+    send_main_window_event('navigate', {'path': '/dashboard/settings'})
 
 
 # Tray setup
@@ -142,11 +144,21 @@ from PySide6.QtCore import QTimer
 from PySide6.QtGui import QColor, QCursor
 from PySide6.QtWidgets import QApplication
 
-# Popup dimensions for different states
+# Popup dimensions
 POPUP_IDLE_WIDTH = 110
 POPUP_IDLE_HEIGHT = 18
-POPUP_ACTIVE_WIDTH = 400
-POPUP_ACTIVE_HEIGHT = 92
+# Active sizes per visualizer style
+POPUP_PILL_W = 490    # multiwave and bar (460 SVG + 16 padding + margin)
+POPUP_PILL_H = 110
+POPUP_RING_W = 155    # ring (148 SVG + margin)
+POPUP_RING_H = 155
+
+
+def get_popup_dims(style: str) -> tuple:
+    """Return (width, height) for the given visualizer style."""
+    if style == "ring":
+        return (POPUP_RING_W, POPUP_RING_H)
+    return (POPUP_PILL_W, POPUP_PILL_H)  # multiwave, bar, or unknown
 
 # Screen info cache (for active monitor)
 _screen_x = 0        # Monitor X offset
@@ -194,35 +206,55 @@ def get_screen_info():
     get_active_monitor_info()
 
 
-def resize_popup(width: int, height: int):
-    """Resize and reposition popup window."""
-    global popup_window
+def _popup_qwindow():
+    """Return the raw QMainWindow for the popup, or None."""
     if popup_window is None:
-        return
-
+        return None
     try:
-        # Resize the window
-        popup_window.set_size(width, height)
+        return popup_window._window._window
+    except Exception:
+        return None
 
-        # Ensure stay-on-top is maintained after resize
-        # Also prevent resizing and make non-focusable to reduce blinking
-        qwindow = popup_window._window._window
-        qwindow.setWindowFlags(
-            Qt.FramelessWindowHint |
-            Qt.WindowStaysOnTopHint |
-            Qt.Tool |
-            Qt.WindowDoesNotAcceptFocus
-        )
-        # Re-apply translucent background (required after setWindowFlags)
-        qwindow.setAttribute(Qt.WA_TranslucentBackground, True)
-        # Prevent window resizing
-        qwindow.setFixedSize(width, height)
-        qwindow.show()
 
-        # Position AFTER show — setWindowFlags resets position on Windows
-        popup_x = _screen_x + (_screen_width - width) // 2
-        popup_y = _screen_y + 16
-        qwindow.move(popup_x, popup_y)
+def show_popup(width: int, height: int):
+    """Size and move the popup into view. Window stays 'shown' off-screen to avoid flicker."""
+    qw = _popup_qwindow()
+    if qw is None:
+        return
+    try:
+        # Determine target position
+        target_x, target_y = None, None
+        saved = controller.settings_service.get_settings()
+        if saved.popup_x is not None and saved.popup_y is not None:
+            saved_rect = QRect(saved.popup_x, saved.popup_y, width, height)
+            on_screen = any(
+                screen.geometry().intersects(saved_rect)
+                for screen in QApplication.instance().screens()
+            )
+            if on_screen:
+                target_x, target_y = saved.popup_x, saved.popup_y
+        if target_x is None:
+            # Default: center-top of active monitor
+            target_x = _screen_x + (_screen_width - width) // 2
+            target_y = _screen_y + 16
+
+        # Resize then move — no hide/show cycle, renderer stays warm
+        qw.setFixedSize(width, height)
+        qw.show()  # no-op if already visible; safety net for very first call
+        qw.move(target_x, target_y)
+    except Exception as e:
+        log.error("Failed to show popup", error=str(e))
+
+
+def resize_popup(width: int, height: int):
+    """Resize popup keeping its current position (style change while recording)."""
+    qw = _popup_qwindow()
+    if qw is None:
+        return
+    try:
+        current_pos = qw.pos()
+        qw.setFixedSize(width, height)
+        qw.move(current_pos)  # keep wherever user has placed it
     except Exception as e:
         log.error("Failed to resize popup", error=str(e))
 
@@ -251,12 +283,7 @@ def init_popup():
             qwindow = popup_window._window._window
             webview = popup_window._window.web_view
 
-            # CRITICAL: Enable translucent background on the window widget
-            # This is required for proper transparency on Windows in production
-            qwindow.setAttribute(Qt.WA_TranslucentBackground, True)
-
             # CRITICAL: Set background color BEFORE loading URL
-            # Qt WebEngineView requires this order to avoid black/white background
             webview.page().setBackgroundColor(QColor(0, 0, 0, 0))
 
             # Load the URL
@@ -267,34 +294,46 @@ def init_popup():
                 popup_window.load_url("http://localhost:5173#/popup")
 
             # Set window flags for stay-on-top and no taskbar icon
-            # WindowDoesNotAcceptFocus prevents stealing focus and reduces blinking
             qwindow.setWindowFlags(
                 Qt.FramelessWindowHint |
                 Qt.WindowStaysOnTopHint |
-                Qt.Tool |  # Prevents taskbar icon
-                Qt.WindowDoesNotAcceptFocus  # Prevents focus stealing and blinking
+                Qt.Tool |
+                Qt.WindowDoesNotAcceptFocus
             )
 
-            # Prevent window resizing (Issue #2)
+            # CRITICAL: Re-apply AFTER setWindowFlags — setWindowFlags resets this attribute
+            qwindow.setAttribute(Qt.WA_TranslucentBackground, True)
+            webview.page().setBackgroundColor(QColor(0, 0, 0, 0))
+
             qwindow.setFixedSize(POPUP_IDLE_WIDTH, POPUP_IDLE_HEIGHT)
 
-            # Show the window
+            # Show off-screen so page loads (required for Qt WebEngine) but user never sees it
             popup_window.show()
+            qwindow.move(-32000, -32000)  # far off-screen — transparent window, never visible
+            log.info("Popup window created (off-screen init)")
 
-            # Position AFTER show — setWindowFlags resets position on Windows
-            popup_x = _screen_x + (_screen_width - POPUP_IDLE_WIDTH) // 2
-            popup_y = _screen_y + 16
-            qwindow.move(popup_x, popup_y)
-            log.info("Popup window created and shown",
-                     x=popup_x, y=popup_y,
-                     monitor_offset_x=_screen_x, monitor_offset_y=_screen_y)
-
-            # Send initial idle state after a brief delay to ensure page is loaded
-            def send_initial_state():
+            # After page loads: send idle state, install drag filter, park off-screen
+            # (Never truly hide — keeping the window "shown" off-screen prevents the
+            # Qt WebEngine renderer from suspending, which eliminates the flash/flicker
+            # that happens when hiding and re-showing causes a re-render.)
+            def on_page_loaded():
+                # Re-apply transparent background (dev mode webview may reset it)
+                try:
+                    webview.page().setBackgroundColor(QColor(0, 0, 0, 0))
+                except Exception:
+                    pass
                 send_popup_event('popup-state', {'state': 'idle'})
-                log.debug("Sent initial idle state to popup")
+                _install_popup_drag_filter()
+                try:
+                    qwindow.move(-32000, -32000)
+                    log.debug("Popup parked off-screen after initial load")
+                except Exception as e:
+                    log.error("Failed to park popup off-screen", error=str(e))
 
-            QTimer.singleShot(200, send_initial_state)
+            QTimer.singleShot(1200, on_page_loaded)
+
+            # Install popup move event filter for position persistence
+            _install_popup_move_filter(qwindow)
         else:
             log.debug("Popup window already exists, skipping creation")
     except Exception as e:
@@ -312,8 +351,9 @@ def send_popup_event(name, detail):
 def _on_recording_start_slot():
     """Slot: Actual recording start handler - runs on main thread via signal."""
     log.info("Recording started")
-    # Resize to active size for recording
-    resize_popup(POPUP_ACTIVE_WIDTH, POPUP_ACTIVE_HEIGHT)
+    style = controller.get_settings().get("visualizerStyle", "multiwave")
+    w, h = get_popup_dims(style)
+    show_popup(w, h)
     send_popup_event('popup-state', {'state': 'recording'})
 
 def on_recording_start():
@@ -335,9 +375,13 @@ def on_recording_stop():
 def _on_transcription_complete_slot(text: str):
     """Slot: Actual transcription complete handler - runs on main thread via signal."""
     log.info("Transcription complete", text_length=len(text))
-    # Resize back to idle size
-    resize_popup(POPUP_IDLE_WIDTH, POPUP_IDLE_HEIGHT)
     send_popup_event('popup-state', {'state': 'idle'})
+    qw = _popup_qwindow()
+    if qw is not None:
+        try:
+            qw.move(-32000, -32000)  # park off-screen instead of hiding (avoids renderer suspend)
+        except Exception as e:
+            log.error("Failed to park popup off-screen", error=str(e))
 
 def on_transcription_complete(text: str):
     """Called from transcription thread - emits signal to main Qt thread."""
@@ -360,10 +404,114 @@ def _on_amplitude_slot(data):
     # Also send to main window (for onboarding mic test)
     send_main_window_event('amplitude', data)
 
-def on_amplitude(amp: float):
+def on_amplitude(data):
     """Called from audio thread - emits signal to main Qt thread."""
     if _signals:
-        _signals.amplitude_changed.emit(amp)
+        _signals.amplitude_changed.emit(data)
+
+
+def _on_visualizer_style_slot(style: str):
+    """Slot: runs on main Qt thread via signal."""
+    send_popup_event('visualizer-style', {'style': style})
+    qw = _popup_qwindow()
+    if qw is not None and qw.isVisible():
+        w, h = get_popup_dims(style)
+        resize_popup(w, h)
+        log.info("Popup resized for new visualizer style", style=style, w=w, h=h)
+
+def on_visualizer_style_changed(style: str):
+    """Called from RPC thread - emits signal to main Qt thread."""
+    if _signals:
+        _signals.visualizer_style_changed.emit(style)
+
+
+# ---- Popup position persistence ----
+_popup_pos_timer: QTimer = None
+_popup_move_filter = None
+
+
+def _save_popup_pos():
+    """Debounced: save popup position after drag."""
+    qw = _popup_qwindow()
+    if qw is None:
+        return
+    try:
+        pos = qw.pos()
+        # Ignore off-screen sentinel position used when popup is "hidden"
+        if pos.x() < -1000 or pos.y() < -1000:
+            return
+        controller.settings_service.save_popup_position(pos.x(), pos.y())
+        log.debug("Popup position saved", x=pos.x(), y=pos.y())
+    except Exception as e:
+        log.error("Failed to save popup position", error=str(e))
+
+
+class _PopupMoveFilter(QObject):
+    def eventFilter(self, obj, event):
+        from PySide6.QtCore import QEvent
+        if event.type() == QEvent.Type.Move:
+            if _popup_pos_timer:
+                _popup_pos_timer.start(600)
+        return False
+
+
+class _PopupDragFilter(QObject):
+    """Event filter that initiates native drag on mouse press anywhere on the popup."""
+    def eventFilter(self, obj, event):
+        from PySide6.QtCore import QEvent
+        if event.type() == QEvent.Type.MouseButtonPress:
+            if event.button() == Qt.LeftButton:
+                do_start_popup_drag()
+                return True  # consume the event
+        return False
+
+
+_popup_drag_filter = None
+
+def _install_popup_move_filter(qwindow):
+    global _popup_pos_timer, _popup_move_filter, _popup_drag_filter
+    _popup_pos_timer = QTimer()
+    _popup_pos_timer.setSingleShot(True)
+    _popup_pos_timer.timeout.connect(_save_popup_pos)
+    _popup_move_filter = _PopupMoveFilter()
+    qwindow.installEventFilter(_popup_move_filter)
+
+def _install_popup_drag_filter():
+    """Install drag filter on the popup's webview so mouse press initiates native drag."""
+    global _popup_drag_filter
+    if popup_window is None:
+        return
+    try:
+        webview = popup_window._window.web_view
+        _popup_drag_filter = _PopupDragFilter()
+        webview.installEventFilter(_popup_drag_filter)
+        # Also install on the webview's focusProxy (where Qt WebEngine really routes input)
+        focus_proxy = webview.focusProxy()
+        if focus_proxy:
+            focus_proxy.installEventFilter(_popup_drag_filter)
+        log.debug("Popup drag filter installed")
+    except Exception as e:
+        log.error("Failed to install popup drag filter", error=str(e))
+
+
+# ---- Popup drag (Win32 native) ----
+def do_start_popup_drag():
+    """Initiate native OS window drag via Win32 PostMessage."""
+    import sys
+    if sys.platform != 'win32':
+        return
+    qw = _popup_qwindow()
+    if qw is None:
+        return
+    try:
+        import ctypes
+        hwnd = int(qw.winId())
+        ctypes.windll.user32.ReleaseCapture()
+        WM_NCLBUTTONDOWN = 0x00A1
+        HTCAPTION = 2
+        ctypes.windll.user32.PostMessageW(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0)
+    except Exception as e:
+        log.error("Popup drag failed", error=str(e))
 
 
 def on_onboarding_complete():
@@ -416,6 +564,8 @@ def send_download_progress(event_name: str, data: dict):
 register_onboarding_complete_callback(on_onboarding_complete)
 register_data_reset_callback(on_data_reset)
 register_download_progress_callback(send_download_progress)
+register_visualizer_style_callback(on_visualizer_style_changed)
+register_popup_drag_callback(do_start_popup_drag)
 
 # Connect thread-safe signals to their slot handlers
 # Qt.QueuedConnection ensures slots run on the main thread
@@ -423,6 +573,7 @@ _signals.recording_started.connect(_on_recording_start_slot, Qt.QueuedConnection
 _signals.recording_stopped.connect(_on_recording_stop_slot, Qt.QueuedConnection)
 _signals.transcription_complete.connect(_on_transcription_complete_slot, Qt.QueuedConnection)
 _signals.amplitude_changed.connect(_on_amplitude_slot, Qt.QueuedConnection)
+_signals.visualizer_style_changed.connect(_on_visualizer_style_slot, Qt.QueuedConnection)
 
 # Set UI callbacks
 controller.set_ui_callbacks(
