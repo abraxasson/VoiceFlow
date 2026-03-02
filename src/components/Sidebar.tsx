@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { Mic, Home, History, Settings, Sparkles, Github, Heart, MessageSquare } from "lucide-react";
 import { cn, formatHotkey } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -18,7 +18,6 @@ interface SidebarProps {
 
 export function Sidebar({ onNavigate }: SidebarProps) {
   const [activeHotkey, setActiveHotkey] = useState<{ key: string; mode: "hold" | "toggle" } | null>(null);
-  const location = useLocation();
 
   useEffect(() => {
     api.getSettings().then((s) => {
