@@ -2,7 +2,7 @@ import { useEffect, useState, useLayoutEffect, useRef, useMemo } from "react";
 import { api } from "@/lib/api";
 
 type PopupState = "idle" | "recording" | "processing";
-type VisualizerStyle = "multiwave" | "ring" | "bar";
+type VisualizerStyle = "multiwave" | "ring" | "bar" | "scope";
 
 interface AudioData {
   amplitude: number;
@@ -482,6 +482,109 @@ function BarViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
 
 
 // ============================================================================
+// STYLE 4 — Scope: Oscilloscope waveform display
+// (reference: classic CRT phosphor with green glow, grid lines,
+//  raw 64-sample waveform reflecting true audio shape)
+// ============================================================================
+function ScopeViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
+  const SVG_W = 460;
+  const SVG_H = 86;
+  const CY = SVG_H / 2;
+  const { amplitude, samples } = audio;
+
+  // Build the waveform path from raw samples
+  const pts: Array<[number, number]> = useMemo(() => {
+    return samples.map((s, i) => {
+      const x = (i / (samples.length - 1)) * SVG_W;
+      // When silent, add a slow idle drift so the line gently breathes
+      const idle = amplitude < 0.015
+        ? Math.sin(animTime * 1.2 + i * 0.22) * 2.0 + Math.sin(animTime * 0.7 + i * 0.11) * 1.2
+        : 0;
+      const y = CY - (s + idle) * (CY - 6) * 1.1;
+      return [x, Math.max(4, Math.min(SVG_H - 4, y))];
+    });
+  }, [samples, amplitude, animTime]);
+
+  const pathD = crPath(pts);
+  const glowStd = 2 + amplitude * 7;
+
+  // Phosphor green, brightens with amplitude
+  const phosphorColor = `rgba(0, 255, 110, ${0.85 + amplitude * 0.15})`;
+  const glowColor = `rgba(0, 255, 80, ${0.25 + amplitude * 0.55})`;
+  const outerGlow = 14 + amplitude * 32;
+
+  return (
+    <div style={{
+      padding: "8px",
+      borderRadius: "20px",
+      background: "linear-gradient(145deg, #000d08, #000810)",
+      boxShadow: [
+        `0 0 ${outerGlow}px rgba(0,255,80,${0.10 + amplitude * 0.30})`,
+        `inset 0 0 24px rgba(0,20,10,0.9)`,
+        `inset 0 1px 0 rgba(0,255,80,0.06)`,
+      ].join(", "),
+      cursor: "grab",
+    }}>
+      <svg width={SVG_W} height={SVG_H} viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+        style={{ display: "block" }}>
+        <defs>
+          <filter id="scopeGlow" x="-10%" y="-60%" width="120%" height="220%">
+            <feGaussianBlur stdDeviation={glowStd} result="b" />
+            <feComposite in="b" in2="b" operator="arithmetic" k1="0" k2="2.2" k3="0" k4="0" result="bright" />
+            <feMerge>
+              <feMergeNode in="bright" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          {/* Subtle scanline overlay */}
+          <pattern id="scanlines" x="0" y="0" width="2" height="2" patternUnits="userSpaceOnUse">
+            <rect x="0" y="0" width="2" height="1" fill="rgba(0,0,0,0.08)" />
+          </pattern>
+        </defs>
+
+        {/* Grid: horizontal divisions */}
+        {[1, 2, 3].map((i) => (
+          <line key={`gh${i}`}
+            x1={0} y1={i * SVG_H / 4} x2={SVG_W} y2={i * SVG_H / 4}
+            stroke="rgba(0,160,70,0.12)" strokeWidth={0.6}
+            strokeDasharray={i === 2 ? "none" : "4,6"}
+          />
+        ))}
+        {/* Grid: vertical divisions */}
+        {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+          <line key={`gv${i}`}
+            x1={i * SVG_W / 8} y1={0} x2={i * SVG_W / 8} y2={SVG_H}
+            stroke="rgba(0,160,70,0.10)" strokeWidth={0.6}
+            strokeDasharray="4,6"
+          />
+        ))}
+
+        {/* Zero/center line — slightly brighter */}
+        <line x1={0} y1={CY} x2={SVG_W} y2={CY}
+          stroke="rgba(0,200,80,0.20)" strokeWidth={0.8} />
+
+        {/* Trigger marker: small tick at left edge */}
+        <line x1={0} y1={CY - 4} x2={0} y2={CY + 4}
+          stroke="rgba(0,255,110,0.35)" strokeWidth={1.5} />
+
+        {/* Glow trace — rendered first for bloom */}
+        <path d={pathD} stroke={glowColor} strokeWidth={5} fill="none"
+          filter="url(#scopeGlow)" opacity={0.65} />
+
+        {/* Crisp phosphor trace */}
+        <path d={pathD} stroke={phosphorColor} strokeWidth={1.8} fill="none"
+          strokeLinecap="round" strokeLinejoin="round" />
+
+        {/* Scanline texture on top */}
+        <rect x={0} y={0} width={SVG_W} height={SVG_H}
+          fill="url(#scanlines)" opacity={0.4} style={{ pointerEvents: "none" }} />
+      </svg>
+    </div>
+  );
+}
+
+
+// ============================================================================
 // Main Popup Component
 // ============================================================================
 export function Popup() {
@@ -577,7 +680,8 @@ export function Popup() {
         <>
           {vizStyle === "ring" && <RingViz audio={audio} animTime={animTime} />}
           {vizStyle === "bar" && <BarViz audio={audio} animTime={animTime} />}
-          {(vizStyle === "multiwave" || !["ring", "bar"].includes(vizStyle)) && (
+          {vizStyle === "scope" && <ScopeViz audio={audio} animTime={animTime} />}
+          {(vizStyle === "multiwave" || !["ring", "bar", "scope"].includes(vizStyle)) && (
             <MultiWaveViz audio={audio} animTime={animTime} />
           )}
         </>

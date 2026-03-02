@@ -26,6 +26,7 @@ import {
   HardDrive,
   Activity,
   Database,
+  ChevronRight,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Settings, Options, GpuInfo, ModelStorageInfo } from "@/lib/types";
@@ -44,17 +45,67 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 
+// ─── Section wrapper ──────────────────────────────────────────────────────────
+function Section({
+  title,
+  description,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  description: string;
+  icon: React.ElementType;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 pb-1">
+        <div className="p-2 rounded-lg bg-primary/10 text-primary">
+          <Icon className="w-4 h-4" />
+        </div>
+        <div>
+          <h2 className="text-sm font-semibold text-foreground tracking-tight">{title}</h2>
+          <p className="text-xs text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ─── Uniform setting card ─────────────────────────────────────────────────────
+function SettingCard({
+  title,
+  description,
+  children,
+  className,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("glass-card p-5 flex flex-col gap-4 h-full", className)}>
+      <div>
+        <p className="text-sm font-semibold text-foreground tracking-tight">{title}</p>
+        {description && (
+          <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+        )}
+      </div>
+      <div className="flex-1 flex flex-col justify-end">{children}</div>
+    </div>
+  );
+}
+
+// ─── Main component ────────────────────────────────────────────────────────────
 export function SettingsTab() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [options, setOptions] = useState<Options | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Model download modal state
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
   const [pendingModel, setPendingModel] = useState<string | null>(null);
-
-  // GPU info state
   const [gpuInfo, setGpuInfo] = useState<GpuInfo | null>(null);
   const [deviceError, setDeviceError] = useState<string | null>(null);
 
@@ -70,8 +121,7 @@ export function SettingsTab() {
       setSettings(settingsData);
       setOptions(optionsData);
       setGpuInfo(gpuData);
-    } catch (error) {
-      console.error("Failed to load settings:", error);
+    } catch {
       setError("Failed to load settings. Please try again.");
       toast.error("Failed to load settings");
     } finally {
@@ -79,134 +129,84 @@ export function SettingsTab() {
     }
   };
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
+  useEffect(() => { loadSettings(); }, []);
 
-  const updateSetting = async <K extends keyof Settings>(
-    key: K,
-    value: Settings[K]
-  ) => {
+  const updateSetting = async <K extends keyof Settings>(key: K, value: Settings[K]) => {
     if (!settings) return;
-
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
-
     try {
       await api.updateSettings({ [key]: value });
       toast.success("Settings saved");
-    } catch (error) {
-      console.error("Failed to update setting:", error);
+    } catch {
       toast.error("Failed to save settings");
-      setSettings(settings); // Revert
+      setSettings(settings);
     }
   };
 
-  // Handle model change - check if download needed
-  const handleModelChange = useCallback(
-    async (newModel: string) => {
-      if (!settings) return;
-
-      try {
-        const modelInfo = await api.getModelInfo(newModel);
-
-        if (modelInfo.cached) {
-          // Model is cached, just update settings
-          updateSetting("model", newModel);
-        } else {
-          // Model needs download - show modal
-          setPendingModel(newModel);
-          setDownloadModalOpen(true);
-        }
-      } catch (err) {
-        console.error("Failed to get model info:", err);
-        toast.error("Failed to check model status");
+  const handleModelChange = useCallback(async (newModel: string) => {
+    if (!settings) return;
+    try {
+      const modelInfo = await api.getModelInfo(newModel);
+      if (modelInfo.cached) {
+        updateSetting("model", newModel);
+      } else {
+        setPendingModel(newModel);
+        setDownloadModalOpen(true);
       }
-    },
-    [settings]
-  );
+    } catch {
+      toast.error("Failed to check model status");
+    }
+  }, [settings]);
 
-  // Handle download complete
-  const handleDownloadComplete = useCallback(
-    (success: boolean) => {
-      if (success && pendingModel) {
-        // Download succeeded, update settings
-        updateSetting("model", pendingModel);
-      }
-      setDownloadModalOpen(false);
-      setPendingModel(null);
-    },
-    [pendingModel]
-  );
+  const handleDownloadComplete = useCallback((success: boolean) => {
+    if (success && pendingModel) updateSetting("model", pendingModel);
+    setDownloadModalOpen(false);
+    setPendingModel(null);
+  }, [pendingModel]);
 
-  // Handle download cancel
   const handleDownloadCancel = useCallback(() => {
     setDownloadModalOpen(false);
     setPendingModel(null);
-    // Settings remain unchanged - dropdown still shows original model
   }, []);
 
-  // Hotkey validation
-  const validateHotkey = useCallback(
-    async (hotkey: string, excludeField: "holdHotkey" | "toggleHotkey") => {
-      try {
-        const result = await api.validateHotkey(hotkey, excludeField);
-        return { valid: result.valid, error: result.error };
-      } catch (err) {
-        return { valid: false, error: "Failed to validate hotkey" };
-      }
-    },
-    []
-  );
+  const validateHotkey = useCallback(async (hotkey: string, excludeField: "holdHotkey" | "toggleHotkey") => {
+    try {
+      const result = await api.validateHotkey(hotkey, excludeField);
+      return { valid: result.valid, error: result.error };
+    } catch {
+      return { valid: false, error: "Failed to validate hotkey" };
+    }
+  }, []);
 
-  // Handle device change with validation
-  const handleDeviceChange = useCallback(
-    async (newDevice: string) => {
-      if (!settings) return;
-
-      setDeviceError(null);
-
-      // Validate the device selection
-      const validation = await api.validateDevice(newDevice);
-      if (!validation.valid) {
-        setDeviceError(validation.error);
-        toast.error(validation.error || "Invalid device selection");
-        return;
-      }
-
-      // Update the setting
-      const newSettings = { ...settings, device: newDevice };
-      setSettings(newSettings);
-
-      try {
-        await api.updateSettings({ device: newDevice });
-        // Refresh GPU info after device change
-        const gpuData = await api.getGpuInfo();
-        setGpuInfo(gpuData);
-        toast.success("Device updated - model will reload");
-      } catch (err) {
-        console.error("Failed to update device:", err);
-        toast.error("Failed to update device");
-        setSettings(settings); // Revert
-      }
-    },
-    [settings]
-  );
+  const handleDeviceChange = useCallback(async (newDevice: string) => {
+    if (!settings) return;
+    setDeviceError(null);
+    const validation = await api.validateDevice(newDevice);
+    if (!validation.valid) {
+      setDeviceError(validation.error);
+      toast.error(validation.error || "Invalid device selection");
+      return;
+    }
+    setSettings({ ...settings, device: newDevice });
+    try {
+      await api.updateSettings({ device: newDevice });
+      const gpuData = await api.getGpuInfo();
+      setGpuInfo(gpuData);
+      toast.success("Device updated — model will reload");
+    } catch {
+      toast.error("Failed to update device");
+      setSettings(settings);
+    }
+  }, [settings]);
 
   useEffect(() => {
     if (!settings) return;
     const root = document.documentElement;
-    let isDark = false;
-    if (settings.theme === "system") {
-      isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    } else {
-      isDark = settings.theme === "dark";
-    }
-    if (isDark) {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
+    let isDark = settings.theme === "system"
+      ? window.matchMedia("(prefers-color-scheme: dark)").matches
+      : settings.theme === "dark";
+    isDark ? root.classList.add("dark") : root.classList.remove("dark");
   }, [settings?.theme]);
 
   if (loading) {
@@ -214,9 +214,7 @@ export function SettingsTab() {
       <div className="min-h-screen w-full bg-background/50 p-6 md:p-10 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-          <p className="text-muted-foreground animate-pulse">
-            Loading preferences...
-          </p>
+          <p className="text-muted-foreground animate-pulse">Loading preferences...</p>
         </div>
       </div>
     );
@@ -226,9 +224,7 @@ export function SettingsTab() {
     return (
       <div className="min-h-screen w-full bg-background/50 p-6 md:p-10 flex items-center justify-center">
         <div className="text-center py-20 px-10 glass-card space-y-4">
-          <p className="text-destructive font-medium text-lg">
-            {error || "Failed to load settings"}
-          </p>
+          <p className="text-destructive font-medium text-lg">{error || "Failed to load settings"}</p>
           <button
             className="px-6 py-2.5 text-sm font-medium rounded-xl bg-background border border-border shadow-sm hover:bg-secondary/50 transition-all"
             onClick={loadSettings}
@@ -244,417 +240,333 @@ export function SettingsTab() {
 
   return (
     <div className="min-h-screen w-full bg-background/50 relative overflow-x-hidden">
-      {/* Background effects */}
       <div className="fixed inset-0 bg-grid opacity-20 pointer-events-none overflow-hidden" />
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="orb orb-primary w-[400px] h-[400px] absolute -top-40 -right-40 opacity-20" />
         <div className="orb orb-accent w-[300px] h-[300px] absolute bottom-20 -left-20 opacity-15" />
       </div>
 
-      <div className="w-full max-w-[1600px] mx-auto p-6 md:p-10 space-y-10 relative z-10">
-        {/* Header */}
+      <div className="w-full max-w-4xl mx-auto p-6 md:p-10 space-y-10 relative z-10">
+        {/* Page header */}
         <div className="flex flex-col gap-2">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tighter text-foreground">
             Sett<span className="headline-serif text-primary">ings</span>
           </h1>
-          <p className="text-lg text-muted-foreground/80 font-light max-w-2xl">
+          <p className="text-lg text-muted-foreground/80 font-light">
             Customize your voice experience. All preferences are saved locally.
           </p>
         </div>
 
-        {/* Divider */}
         <div className="divider-gradient" />
 
-        {/* BENTO GRID */}
-        <div className="grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-6">
-          {/* 1. Language (Span 4) */}
-          <BentoSettingCard
-            title="Language"
-            description="Target language for transcription"
-            icon={Globe}
-            className="md:col-span-6 lg:col-span-4"
-          >
-            <Select
-              value={settings.language}
-              onValueChange={(value) => updateSetting("language", value)}
-            >
-              <SelectTrigger className="mt-auto h-12 rounded-xl">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {options.languages.map((lang) => (
-                  <SelectItem key={lang} value={lang}>
-                    {lang === "auto" ? "Auto-detect" : lang.toUpperCase()}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </BentoSettingCard>
-
-          {/* 2. Model (Span 4) */}
-          <BentoSettingCard
-            title="AI Model"
-            description="Smaller is faster, larger is smarter"
-            icon={Cpu}
-            className="md:col-span-6 lg:col-span-4"
-          >
-            <Select
-              value={settings.model}
-              onValueChange={handleModelChange}
-            >
-              <SelectTrigger className="mt-auto h-12 rounded-xl">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {options.models.map((model) => (
-                  <SelectItem key={model} value={model}>
-                    {model.charAt(0).toUpperCase() + model.slice(1)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </BentoSettingCard>
-
-          {/* 3. Appearance (Span 4) */}
-          <BentoSettingCard
-            title="Theme"
-            description="Customize the interface look"
-            icon={Palette}
-            className="md:col-span-6 lg:col-span-4"
-          >
-            <Select
-              value={settings.theme}
-              onValueChange={(value) =>
-                updateSetting("theme", value as Settings["theme"])
-              }
-            >
-              <SelectTrigger className="mt-auto h-12 rounded-xl">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {options.themeOptions.map((theme) => (
-                  <SelectItem key={theme} value={theme}>
-                    {theme.charAt(0).toUpperCase() + theme.slice(1)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </BentoSettingCard>
-
-          {/* 4. Microphone (Span 6) */}
-          <BentoSettingCard
-            title="Microphone Input"
-            description="Select your preferred audio capture device"
-            icon={Mic}
-            className="md:col-span-6 lg:col-span-6"
-          >
-            <Select
-              value={String(settings.microphone)}
-              onValueChange={(value) =>
-                updateSetting("microphone", Number(value))
-              }
-            >
-              <SelectTrigger className="mt-auto h-12 rounded-xl">
-                <div className="flex items-center gap-2">
-                  <Mic className="w-4 h-4 opacity-50" />
+        {/* ── SECTION 1: Transcription ──────────────────────────── */}
+        <Section icon={Globe} title="Transcription" description="Language, model and processing options">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <SettingCard title="Language" description="Target transcription language">
+              <Select value={settings.language} onValueChange={(v) => updateSetting("language", v)}>
+                <SelectTrigger className="h-10 rounded-xl">
                   <SelectValue />
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="-1">Default System Mic</SelectItem>
-                {options.microphones.map((mic) => (
-                  <SelectItem key={mic.id} value={String(mic.id)}>
-                    {mic.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </BentoSettingCard>
+                </SelectTrigger>
+                <SelectContent>
+                  {options.languages.map((lang) => (
+                    <SelectItem key={lang} value={lang}>
+                      {lang === "auto" ? "Auto-detect" : lang.toUpperCase()}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </SettingCard>
 
-          {/* 5. History Retention (Span 6) */}
-          <BentoSettingCard
-            title="Data Retention"
-            description="How long should we keep your transcriptions?"
-            icon={Clock}
-            className="md:col-span-6 lg:col-span-6"
-          >
-            <Select
-              value={String(settings.retention)}
-              onValueChange={(value) =>
-                updateSetting("retention", Number(value))
-              }
-            >
-              <SelectTrigger className="mt-auto h-12 rounded-xl">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {retentionEntries.map(([label, days]) => (
-                  <SelectItem key={days} value={String(days)}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </BentoSettingCard>
+            <SettingCard title="AI Model" description="Smaller is faster, larger is more accurate">
+              <Select value={settings.model} onValueChange={handleModelChange}>
+                <SelectTrigger className="h-10 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {options.models.map((model) => (
+                    <SelectItem key={model} value={model}>
+                      {model.charAt(0).toUpperCase() + model.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </SettingCard>
 
-          {/* 6. Audio History (Span 6) */}
-          <BentoSettingCard
-            title="History Audio"
-            description="Optionally keep your dictation audio with each entry"
-            icon={FileAudio}
-            className="md:col-span-6 lg:col-span-6"
-          >
-            <div className="mt-auto flex items-center justify-between p-3 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors">
-              <Label
-                htmlFor="save-audio-history"
-                className="font-medium cursor-pointer"
-              >
-                Save dictation audio to History
-              </Label>
-              <Switch
-                id="save-audio-history"
-                checked={settings.saveAudioToHistory}
-                onCheckedChange={(checked) =>
-                  updateSetting("saveAudioToHistory", checked)
-                }
-              />
-            </div>
-            <p className="text-xs text-muted-foreground mt-3">
-              Audio stays on your device. When enabled, History items show an Audio badge with playback.
-            </p>
-          </BentoSettingCard>
-
-          {/* 7. System (Auto Start) (Span 4) */}
-          <BentoSettingCard
-            title="System"
-            description="Startup behavior"
-            icon={Zap}
-            className="md:col-span-6 lg:col-span-4"
-          >
-            <div className="mt-auto flex items-center justify-between p-3 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors">
-              <Label
-                htmlFor="auto-start"
-                className="font-medium cursor-pointer"
-              >
-                Start with Windows
-              </Label>
-              <Switch
-                id="auto-start"
-                checked={settings.autoStart}
-                onCheckedChange={(checked) =>
-                  updateSetting("autoStart", checked)
-                }
-              />
-            </div>
-          </BentoSettingCard>
-
-          {/* 8. Data Folder (Span 4) */}
-          <BentoSettingCard
-            title="Storage"
-            description="Local data location"
-            icon={FolderOpen}
-            className="md:col-span-6 lg:col-span-4"
-          >
-            <div className="mt-auto">
-              <button
-                onClick={() => api.openDataFolder()}
-                className="w-full flex items-center justify-center gap-2 h-12 rounded-xl border border-border/50 bg-background/50 hover:bg-primary/5 hover:border-primary/30 hover:text-primary transition-all text-sm font-medium text-muted-foreground"
-              >
-                <FolderOpen className="w-4 h-4" />
-                Open Data Folder
-              </button>
-            </div>
-          </BentoSettingCard>
-
-          {/* 9. Voice Visualizer (Span 4) */}
-          <BentoSettingCard
-            title="Voice Visualizer"
-            description="Recording animation style"
-            icon={Activity}
-            className="md:col-span-6 lg:col-span-4"
-          >
-            <div className="mt-auto grid grid-cols-3 gap-2">
-              {[
-                { id: "multiwave", label: "Wave" },
-                { id: "ring",      label: "Ring" },
-                { id: "bar",       label: "Equalizer" },
-              ].map((viz) => (
-                <button
-                  key={viz.id}
-                  onClick={() => updateSetting("visualizerStyle", viz.id)}
-                  className={cn(
-                    "flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all",
-                    settings.visualizerStyle === viz.id
-                      ? "border-primary/60 bg-primary/10 text-primary"
-                      : "border-border/40 bg-secondary/20 hover:bg-secondary/40 text-muted-foreground"
-                  )}
-                >
-                  <VizMiniPreview style={viz.id} />
-                  <span className="text-[10px] font-medium">{viz.label}</span>
-                </button>
-              ))}
-            </div>
-          </BentoSettingCard>
-
-          {/* 11. Keyboard Shortcuts (Full Width) */}
-          <BentoSettingCard
-            title="Keyboard Shortcuts"
-            description="Customize recording hotkeys"
-            icon={Keyboard}
-            className="md:col-span-6 lg:col-span-12"
-          >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Hold Mode */}
-              <div className="space-y-4 p-4 rounded-xl bg-secondary/20">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Hand className="w-5 h-5 text-primary" />
-                    <div>
-                      <h4 className="font-medium">Hold Mode</h4>
-                      <p className="text-xs text-muted-foreground">
-                        Hold to record, release to stop
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={settings.holdHotkeyEnabled}
-                    onCheckedChange={(checked) =>
-                      updateSetting("holdHotkeyEnabled", checked)
-                    }
-                  />
-                </div>
-
-                <HotkeyCapture
-                  value={settings.holdHotkey}
-                  onChange={(hotkey) => updateSetting("holdHotkey", hotkey)}
-                  onValidate={(hotkey) => validateHotkey(hotkey, "holdHotkey")}
-                  disabled={!settings.holdHotkeyEnabled}
-                />
-              </div>
-
-              {/* Toggle Mode */}
-              <div className="space-y-4 p-4 rounded-xl bg-secondary/20">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <ToggleRight className="w-5 h-5 text-primary" />
-                    <div>
-                      <h4 className="font-medium">Toggle Mode</h4>
-                      <p className="text-xs text-muted-foreground">
-                        Press once to start, press again to stop
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={settings.toggleHotkeyEnabled}
-                    onCheckedChange={(checked) =>
-                      updateSetting("toggleHotkeyEnabled", checked)
-                    }
-                  />
-                </div>
-
-                <HotkeyCapture
-                  value={settings.toggleHotkey}
-                  onChange={(hotkey) => updateSetting("toggleHotkey", hotkey)}
-                  onValidate={(hotkey) => validateHotkey(hotkey, "toggleHotkey")}
-                  disabled={!settings.toggleHotkeyEnabled}
-                />
-              </div>
-            </div>
-          </BentoSettingCard>
-
-          {/* Advanced Section Divider */}
-          <div className="md:col-span-6 lg:col-span-12 pt-4">
-            <h2 className="text-xl font-semibold tracking-tight text-foreground mb-1">
-              Advanced
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Hardware and performance settings
-            </p>
+            <SettingCard title="Theme" description="Interface color scheme">
+              <Select value={settings.theme} onValueChange={(v) => updateSetting("theme", v as Settings["theme"])}>
+                <SelectTrigger className="h-10 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {options.themeOptions.map((theme) => (
+                    <SelectItem key={theme} value={theme}>
+                      {theme.charAt(0).toUpperCase() + theme.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </SettingCard>
           </div>
+        </Section>
 
-          {/* 9. GPU / Device (Span 6) */}
-          <BentoSettingCard
-            title="Compute Device"
-            description="Choose CPU or GPU for transcription"
-            icon={Cpu}
-            className="md:col-span-6 lg:col-span-6"
-          >
-            <Select
-              value={settings.device}
-              onValueChange={handleDeviceChange}
-            >
-              <SelectTrigger className="h-12 rounded-xl">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {options.deviceOptions.map((device) => (
-                  <SelectItem
-                    key={device}
-                    value={device}
-                    disabled={device === "cuda" && !gpuInfo?.cudaAvailable}
-                  >
-                    {device === "auto"
-                      ? "Auto (Recommended)"
-                      : device === "cuda"
-                        ? `CUDA${!gpuInfo?.cudaAvailable ? " (Unavailable)" : ""}`
-                        : "CPU"}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {deviceError && (
-              <p className="text-xs text-destructive mt-2">{deviceError}</p>
-            )}
-            {gpuInfo && (
-              <div className="mt-4 p-3 rounded-xl bg-secondary/30 space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Status</span>
-                  <span className={
-                    gpuInfo.cudaAvailable
-                      ? "text-green-500"
-                      : gpuInfo.gpuName && !gpuInfo.cudnnAvailable
-                        ? "text-amber-500"
-                        : "text-muted-foreground"
-                  }>
-                    {gpuInfo.cudaAvailable
-                      ? "CUDA Available"
-                      : gpuInfo.gpuName && !gpuInfo.cudnnAvailable
-                        ? "cuDNN Missing"
-                        : "CPU Only"}
-                  </span>
+        {/* ── SECTION 2: Input & History ────────────────────────── */}
+        <Section icon={Mic} title="Input & History" description="Microphone, data retention and audio recording">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <SettingCard title="Microphone" description="Audio capture device" className="sm:col-span-1">
+              <Select
+                value={String(settings.microphone)}
+                onValueChange={(v) => updateSetting("microphone", Number(v))}
+              >
+                <SelectTrigger className="h-10 rounded-xl">
+                  <div className="flex items-center gap-2">
+                    <Mic className="w-3.5 h-3.5 opacity-50" />
+                    <SelectValue />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="-1">Default System Mic</SelectItem>
+                  {options.microphones.map((mic) => (
+                    <SelectItem key={mic.id} value={String(mic.id)}>{mic.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </SettingCard>
+
+            <SettingCard title="Data Retention" description="How long to keep transcriptions">
+              <Select
+                value={String(settings.retention)}
+                onValueChange={(v) => updateSetting("retention", Number(v))}
+              >
+                <SelectTrigger className="h-10 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {retentionEntries.map(([label, days]) => (
+                    <SelectItem key={days} value={String(days)}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </SettingCard>
+
+            <SettingCard title="History Audio" description="Store dictation recordings with each entry">
+              <div className="flex items-center justify-between p-3 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors">
+                <div className="flex items-center gap-2">
+                  <FileAudio className="w-4 h-4 text-muted-foreground/70" />
+                  <Label htmlFor="save-audio-history" className="text-sm font-medium cursor-pointer">
+                    Save audio
+                  </Label>
                 </div>
-                {gpuInfo.gpuName && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">GPU</span>
-                    <span className="text-foreground truncate ml-2 max-w-[180px]" title={gpuInfo.gpuName}>
-                      {gpuInfo.gpuName}
+                <Switch
+                  id="save-audio-history"
+                  checked={settings.saveAudioToHistory}
+                  onCheckedChange={(checked) => updateSetting("saveAudioToHistory", checked)}
+                />
+              </div>
+            </SettingCard>
+          </div>
+        </Section>
+
+        {/* ── SECTION 3: Appearance ─────────────────────────────── */}
+        <Section icon={Activity} title="Appearance & Behavior" description="Popup visualizer and system settings">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-start">
+            {/* Visualizer picker — spans 2 cols */}
+            <SettingCard title="Voice Visualizer" description="Recording animation style" className="sm:col-span-2">
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { id: "multiwave", label: "Wave" },
+                  { id: "ring",      label: "Ring" },
+                  { id: "bar",       label: "Equalizer" },
+                  { id: "scope",     label: "Scope" },
+                ].map((viz) => (
+                  <button
+                    key={viz.id}
+                    onClick={() => updateSetting("visualizerStyle", viz.id)}
+                    className={cn(
+                      "flex flex-col items-center gap-1.5 p-2.5 rounded-xl border transition-all",
+                      settings.visualizerStyle === viz.id
+                        ? "border-primary/60 bg-primary/10 text-primary"
+                        : "border-border/40 bg-secondary/20 hover:bg-secondary/40 text-muted-foreground"
+                    )}
+                  >
+                    <VizMiniPreview style={viz.id} />
+                    <span className="text-[10px] font-medium">{viz.label}</span>
+                  </button>
+                ))}
+              </div>
+            </SettingCard>
+
+            {/* Right column: stacked behavior cards */}
+            <div className="flex flex-col gap-4">
+              <SettingCard title="Startup" description="Run automatically with Windows">
+                <div className="flex items-center justify-between p-3 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-muted-foreground/70" />
+                    <Label htmlFor="auto-start" className="text-sm font-medium cursor-pointer">
+                      Auto-start
+                    </Label>
+                  </div>
+                  <Switch
+                    id="auto-start"
+                    checked={settings.autoStart}
+                    onCheckedChange={(checked) => updateSetting("autoStart", checked)}
+                  />
+                </div>
+              </SettingCard>
+
+              <SettingCard title="Storage" description="Browse local data files">
+                <button
+                  onClick={() => api.openDataFolder()}
+                  className="w-full flex items-center justify-between gap-2 h-10 px-3 rounded-xl border border-border/50 bg-background/50 hover:bg-primary/5 hover:border-primary/30 hover:text-primary transition-all text-sm font-medium text-muted-foreground"
+                >
+                  <div className="flex items-center gap-2">
+                    <FolderOpen className="w-4 h-4" />
+                    Open Data Folder
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+                </button>
+              </SettingCard>
+            </div>
+          </div>
+        </Section>
+
+        {/* ── SECTION 4: Keyboard Shortcuts ─────────────────────── */}
+        <Section icon={Keyboard} title="Keyboard Shortcuts" description="Configure recording hotkeys">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Hold Mode */}
+            <div className="glass-card p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                    <Hand className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Hold Mode</p>
+                    <p className="text-xs text-muted-foreground">Hold to record, release to stop</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={settings.holdHotkeyEnabled}
+                  onCheckedChange={(checked) => updateSetting("holdHotkeyEnabled", checked)}
+                />
+              </div>
+              <HotkeyCapture
+                value={settings.holdHotkey}
+                onChange={(hotkey) => updateSetting("holdHotkey", hotkey)}
+                onValidate={(hotkey) => validateHotkey(hotkey, "holdHotkey")}
+                disabled={!settings.holdHotkeyEnabled}
+              />
+            </div>
+
+            {/* Toggle Mode */}
+            <div className="glass-card p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                    <ToggleRight className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Toggle Mode</p>
+                    <p className="text-xs text-muted-foreground">Press once to start, again to stop</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={settings.toggleHotkeyEnabled}
+                  onCheckedChange={(checked) => updateSetting("toggleHotkeyEnabled", checked)}
+                />
+              </div>
+              <HotkeyCapture
+                value={settings.toggleHotkey}
+                onChange={(hotkey) => updateSetting("toggleHotkey", hotkey)}
+                onValidate={(hotkey) => validateHotkey(hotkey, "toggleHotkey")}
+                disabled={!settings.toggleHotkeyEnabled}
+              />
+            </div>
+          </div>
+        </Section>
+
+        {/* ── SECTION 5: Advanced ───────────────────────────────── */}
+        <Section icon={Cpu} title="Advanced" description="Hardware and performance configuration">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Compute Device */}
+            <div className="glass-card p-5 space-y-4 h-full">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Compute Device</p>
+                <p className="text-xs text-muted-foreground mt-0.5">CPU or GPU for transcription inference</p>
+              </div>
+              <Select value={settings.device} onValueChange={handleDeviceChange}>
+                <SelectTrigger className="h-10 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {options.deviceOptions.map((device) => (
+                    <SelectItem
+                      key={device}
+                      value={device}
+                      disabled={device === "cuda" && !gpuInfo?.cudaAvailable}
+                    >
+                      {device === "auto"
+                        ? "Auto (Recommended)"
+                        : device === "cuda"
+                          ? `CUDA${!gpuInfo?.cudaAvailable ? " (Unavailable)" : ""}`
+                          : "CPU"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {deviceError && <p className="text-xs text-destructive">{deviceError}</p>}
+              {gpuInfo && (
+                <div className="p-3 rounded-xl bg-secondary/30 space-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Status</span>
+                    <span className={
+                      gpuInfo.cudaAvailable ? "text-green-500"
+                        : gpuInfo.gpuName && !gpuInfo.cudnnAvailable ? "text-amber-500"
+                        : "text-muted-foreground"
+                    }>
+                      {gpuInfo.cudaAvailable ? "CUDA Available"
+                        : gpuInfo.gpuName && !gpuInfo.cudnnAvailable ? "cuDNN Missing"
+                        : "CPU Only"}
                     </span>
                   </div>
-                )}
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Active</span>
-                  <span className="text-foreground">
-                    {gpuInfo.currentDevice.toUpperCase()} ({gpuInfo.currentComputeType})
-                  </span>
+                  {gpuInfo.gpuName && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">GPU</span>
+                      <span className="truncate ml-2 max-w-[180px]" title={gpuInfo.gpuName}>
+                        {gpuInfo.gpuName}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Active</span>
+                    <span>{gpuInfo.currentDevice.toUpperCase()} ({gpuInfo.currentComputeType})</span>
+                  </div>
+                  {gpuInfo.gpuName && !gpuInfo.cudnnAvailable && (
+                    <p className="text-xs text-amber-500 pt-1">Install cuDNN 9.x for GPU acceleration</p>
+                  )}
                 </div>
-                {gpuInfo.gpuName && !gpuInfo.cudnnAvailable && (
-                  <p className="text-xs text-amber-500 pt-1">
-                    Install cuDNN 9.x for GPU acceleration
-                  </p>
-                )}
-              </div>
-            )}
-          </BentoSettingCard>
+              )}
+            </div>
 
-          {/* Model Storage (Span 6) */}
-          <ModelStorageCard />
+            {/* Model Storage */}
+            <ModelStorageCard />
+          </div>
+        </Section>
 
-          {/* Danger Zone (Span 4) */}
-          <DangerZoneCard />
+        {/* ── SECTION 6: Danger Zone ────────────────────────────── */}
+        <div className="border border-destructive/20 rounded-2xl p-5 space-y-4 bg-destructive/5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-destructive/10 text-destructive">
+              <Trash2 className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Danger Zone</p>
+              <p className="text-xs text-muted-foreground">Irreversible — all deleted data cannot be recovered</p>
+            </div>
+          </div>
+          <DangerZoneActions />
         </div>
       </div>
 
-      {/* Model Download Modal */}
       {pendingModel && (
         <ModelDownloadModal
           open={downloadModalOpen}
@@ -667,56 +579,11 @@ export function SettingsTab() {
   );
 }
 
-// BENTO CARD COMPONENT
-function BentoSettingCard({
-  children,
-  title,
-  description,
-  icon: Icon,
-  className,
-  iconClass = "text-primary bg-primary/10",
-}: {
-  children: React.ReactNode;
-  title: string;
-  description: string;
-  icon: React.ElementType;
-  className?: string;
-  iconClass?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "group glass-card flex flex-col justify-between p-6 transition-colors duration-150",
-        className
-      )}
-    >
-      <div className="flex items-start gap-4 mb-6">
-        <div
-          className={cn(
-            "p-2.5 rounded-xl border border-primary/20",
-            iconClass
-          )}
-        >
-          <Icon className="w-5 h-5" />
-        </div>
-        <div className="space-y-1 flex-1">
-          <h3 className="text-base font-semibold tracking-tight">{title}</h3>
-          <p className="text-sm text-muted-foreground line-clamp-2">
-            {description}
-          </p>
-        </div>
-      </div>
-      <div className="flex-grow flex flex-col justify-end">{children}</div>
-    </div>
-  );
-}
-
-// VISUALIZER MINI PREVIEW
+// ─── Visualizer mini previews ─────────────────────────────────────────────────
 function VizMiniPreview({ style }: { style: string }) {
   if (style === "ring") {
-    // Dense radial bars around circle, cyan→purple→magenta
     return (
-      <svg width={44} height={44} viewBox="0 0 44 44">
+      <svg width={40} height={40} viewBox="0 0 44 44">
         {Array.from({ length: 24 }, (_, i) => {
           const angle = (i / 24) * Math.PI * 2 - Math.PI / 2;
           const val = 0.3 + Math.abs(Math.sin(i * 0.8 + 0.5)) * 0.7;
@@ -736,36 +603,48 @@ function VizMiniPreview({ style }: { style: string }) {
     );
   }
   if (style === "bar") {
-    // Bars with wave lines overlay, rainbow colors
     const heights = [4, 7, 11, 14, 12, 13, 10, 14, 9, 5];
-    const colors = ["#00ff80","#00e0ff","#2080ff","#6040ff","#c020ff",
-                    "#ff20a0","#ff4040","#ff8020","#ffc020","#ffe040"];
+    const colors = ["#00ff80","#00e0ff","#2080ff","#6040ff","#c020ff","#ff20a0","#ff4040","#ff8020","#ffc020","#ffe040"];
     return (
-      <svg width={44} height={44} viewBox="0 0 44 44">
+      <svg width={40} height={40} viewBox="0 0 44 44">
         {heights.map((h, i) => (
           <g key={i}>
-            <rect x={2 + i * 4} y={22 - h} width={3} height={h} fill={colors[i]} rx={1} opacity={0.7} />
-            <rect x={2 + i * 4} y={22} width={3} height={h} fill={colors[i]} rx={1} opacity={0.7} />
+            <rect x={2 + i * 4} y={22 - h} width={3} height={h} fill={colors[i]} rx={1} opacity={0.8} />
+            <rect x={2 + i * 4} y={22} width={3} height={h} fill={colors[i]} rx={1} opacity={0.8} />
           </g>
         ))}
-        {/* Wave overlay lines */}
-        <path d="M2,16 C8,10 16,26 22,18 C28,10 36,24 42,15" stroke="url(#mpg)" strokeWidth="0.8" fill="none" opacity="0.6" />
-        <path d="M2,28 C8,34 16,18 22,26 C28,34 36,20 42,29" stroke="url(#mpg)" strokeWidth="0.8" fill="none" opacity="0.6" />
-        <defs>
-          <linearGradient id="mpg" x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0%" stopColor="#00ff80" /><stop offset="50%" stopColor="#8020ff" /><stop offset="100%" stopColor="#ffc020" />
-          </linearGradient>
-        </defs>
       </svg>
     );
   }
-  // multiwave: multiple flowing lines with rainbow gradient
+  if (style === "scope") {
+    const pts: Array<[number, number]> = Array.from({ length: 22 }, (_, i) => {
+      const x = 2 + (i / 21) * 40;
+      const y = 22 + Math.sin(i * 0.65) * 11 * (0.45 + Math.abs(Math.sin(i * 0.4)) * 0.55);
+      return [x, y];
+    });
+    const d = pts.reduce((acc, [x, y], i) => acc + (i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`), "");
+    return (
+      <svg width={40} height={40} viewBox="0 0 44 44">
+        <rect x={2} y={2} width={40} height={40} rx={3} fill="#000810" opacity={0.6} />
+        {[1, 2, 3].map(i => (
+          <line key={`h${i}`} x1={2} y1={i * 11} x2={42} y2={i * 11} stroke="rgba(0,140,60,0.25)" strokeWidth={0.4} />
+        ))}
+        {[1, 2, 3].map(i => (
+          <line key={`v${i}`} x1={2 + i * 10} y1={2} x2={2 + i * 10} y2={42} stroke="rgba(0,140,60,0.25)" strokeWidth={0.4} />
+        ))}
+        <path d={d} stroke="#00ff64" strokeWidth={1.5} fill="none" />
+      </svg>
+    );
+  }
+  // multiwave
   return (
-    <svg width={44} height={44} viewBox="0 0 44 44">
+    <svg width={40} height={40} viewBox="0 0 44 44">
       <defs>
         <linearGradient id="mwpg" x1="0" x2="1" y1="0" y2="0">
-          <stop offset="0%" stopColor="#ffb020" /><stop offset="25%" stopColor="#00e8d0" />
-          <stop offset="50%" stopColor="#20a0ff" /><stop offset="75%" stopColor="#e040a0" />
+          <stop offset="0%" stopColor="#ffb020" />
+          <stop offset="25%" stopColor="#00e8d0" />
+          <stop offset="50%" stopColor="#20a0ff" />
+          <stop offset="75%" stopColor="#e040a0" />
           <stop offset="100%" stopColor="#ff3030" />
         </linearGradient>
       </defs>
@@ -785,7 +664,7 @@ function VizMiniPreview({ style }: { style: string }) {
   );
 }
 
-// MODEL STORAGE CARD
+// ─── Model Storage Card ───────────────────────────────────────────────────────
 function ModelStorageCard() {
   const [storageInfo, setStorageInfo] = useState<ModelStorageInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -801,77 +680,65 @@ function ModelStorageCard() {
     mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb.toFixed(0)} MB`;
 
   return (
-    <BentoSettingCard
-      title="Model Storage"
-      description="Cached Whisper models — disk size and estimated RAM when loaded"
-      icon={Database}
-      className="md:col-span-6 lg:col-span-6"
-    >
-      <div className="mt-auto space-y-3">
-        {loading ? (
-          <div className="h-24 rounded-xl bg-secondary/30 animate-pulse" />
-        ) : storageInfo ? (
-          <>
-            {/* Summary row */}
-            <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
-              <span>{storageInfo.models.length} model{storageInfo.models.length !== 1 ? "s" : ""} cached</span>
-              <span>Total on disk: <span className="font-medium text-foreground">{sizeFmt(storageInfo.totalSizeMb)}</span></span>
-            </div>
-
-            {/* Per-model list */}
-            {storageInfo.models.length > 0 ? (
-              <div className="space-y-1.5 max-h-52 overflow-y-auto pr-0.5">
-                {storageInfo.models.map((m) => (
-                  <div key={m.name}
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors"
-                  >
-                    {/* Model name */}
-                    <span className="font-mono text-xs font-semibold text-foreground min-w-[90px]">
-                      {m.name}
-                    </span>
-
-                    {/* Disk size badge */}
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-background/60 border border-border/40 text-muted-foreground whitespace-nowrap">
-                      Disk: {sizeFmt(m.sizeMb)}
-                    </span>
-
-                    {/* RAM bar */}
-                    <div className="flex-1 flex items-center gap-1.5 min-w-0">
-                      <div className="flex-1 h-1.5 rounded-full bg-secondary overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-primary/70 transition-all"
-                          style={{ width: `${Math.min(100, (m.ramMb / 6200) * 100)}%` }}
-                        />
-                      </div>
-                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                        ~{sizeFmt(m.ramMb)} RAM
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-2">No models downloaded yet</p>
-            )}
-
-            <button
-              onClick={() => api.openModelFolder()}
-              className="w-full flex items-center justify-center gap-2 h-10 rounded-xl border border-border/50 bg-background/50 hover:bg-primary/5 hover:border-primary/30 hover:text-primary transition-all text-sm font-medium text-muted-foreground"
-            >
-              <FolderOpen className="w-4 h-4" />
-              Open Models Folder
-            </button>
-          </>
-        ) : (
-          <p className="text-sm text-muted-foreground">Unable to load storage info</p>
-        )}
+    <div className="glass-card p-5 flex flex-col gap-4 h-full">
+      <div>
+        <p className="text-sm font-semibold text-foreground">Model Storage</p>
+        <p className="text-xs text-muted-foreground mt-0.5">Cached Whisper models — disk and RAM usage</p>
       </div>
-    </BentoSettingCard>
+
+      {loading ? (
+        <div className="flex-1 rounded-xl bg-secondary/30 animate-pulse min-h-[80px]" />
+      ) : storageInfo ? (
+        <div className="flex flex-col gap-3 flex-1">
+          <div className="flex items-center justify-between text-xs text-muted-foreground px-0.5">
+            <span>{storageInfo.models.length} model{storageInfo.models.length !== 1 ? "s" : ""} cached</span>
+            <span>Total: <span className="font-medium text-foreground">{sizeFmt(storageInfo.totalSizeMb)}</span></span>
+          </div>
+
+          {storageInfo.models.length > 0 ? (
+            <div className="space-y-1.5 max-h-44 overflow-y-auto">
+              {storageInfo.models.map((m) => (
+                <div key={m.name} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-secondary/30">
+                  <span className="font-mono text-xs font-semibold min-w-[80px]">{m.name}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-background/60 border border-border/40 text-muted-foreground whitespace-nowrap">
+                    {sizeFmt(m.sizeMb)}
+                  </span>
+                  <div className="flex-1 flex items-center gap-1.5 min-w-0">
+                    <div className="flex-1 h-1.5 rounded-full bg-secondary overflow-hidden">
+                      <div className="h-full rounded-full bg-primary/70"
+                        style={{ width: `${Math.min(100, (m.ramMb / 6200) * 100)}%` }} />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                      ~{sizeFmt(m.ramMb)} RAM
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">No models downloaded yet</p>
+          )}
+
+          <button
+            onClick={() => api.openModelFolder()}
+            className="mt-auto w-full flex items-center justify-between h-9 px-3 rounded-xl border border-border/50 bg-background/50 hover:bg-primary/5 hover:border-primary/30 hover:text-primary transition-all text-sm font-medium text-muted-foreground"
+          >
+            <div className="flex items-center gap-2">
+              <Database className="w-3.5 h-3.5" />
+              Open Models Folder
+            </div>
+            <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+          </button>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">Unable to load storage info</p>
+      )}
+    </div>
   );
 }
 
-// DANGER ZONE CARD WITH DELETE OPTIONS
-function DangerZoneCard() {
+// ─── Danger Zone actions ──────────────────────────────────────────────────────
+function DangerZoneActions() {
   const [deleteAppData, setDeleteAppData] = useState(true);
   const [deleteModels, setDeleteModels] = useState(false);
   const [deleteCudaLibs, setDeleteCudaLibs] = useState(false);
@@ -880,34 +747,17 @@ function DangerZoneCard() {
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
-      // Delete app data (history, settings, etc.)
-      if (deleteAppData) {
-        await api.resetAllData();
-      }
-
-      // Delete models (clear HuggingFace cache)
-      if (deleteModels) {
-        await api.clearModelCache();
-      }
-
-      // Delete CUDA libraries (cuDNN + cuBLAS)
-      if (deleteCudaLibs) {
-        await api.clearCudaLibs();
-      }
+      if (deleteAppData) await api.resetAllData();
+      if (deleteModels) await api.clearModelCache();
+      if (deleteCudaLibs) await api.clearCudaLibs();
 
       const parts = [];
       if (deleteAppData) parts.push("app data");
       if (deleteModels) parts.push("models");
       if (deleteCudaLibs) parts.push("CUDA libraries");
-      const message = parts.length > 0 ? `Deleted: ${parts.join(", ")}` : "Nothing deleted";
-
-      toast.success(`${message} - returning to setup`);
-      setTimeout(() => {
-        window.location.hash = "/onboarding";
-        window.location.reload();
-      }, 500);
-    } catch (error) {
-      console.error("Failed to delete data:", error);
+      toast.success(`Deleted: ${parts.join(", ")} — returning to setup`);
+      setTimeout(() => { window.location.hash = "/onboarding"; window.location.reload(); }, 500);
+    } catch {
       toast.error("Failed to delete data");
     } finally {
       setIsDeleting(false);
@@ -917,109 +767,63 @@ function DangerZoneCard() {
   const canDelete = deleteAppData || deleteModels || deleteCudaLibs;
 
   return (
-    <BentoSettingCard
-      title="Danger Zone"
-      description="Irreversible actions"
-      icon={Trash2}
-      className="md:col-span-6 lg:col-span-4 !border-destructive/20"
-      iconClass="text-destructive bg-destructive/10"
-    >
-      <div className="mt-auto">
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <button className="w-full flex items-center justify-center gap-2 h-12 rounded-xl border border-destructive/30 bg-destructive/5 hover:bg-destructive hover:text-white hover:border-destructive transition-all text-sm font-medium text-destructive">
-              <Trash2 className="w-4 h-4" />
-              Reset Data
-            </button>
-          </AlertDialogTrigger>
-          <AlertDialogContent className="glass-strong rounded-2xl">
-            <AlertDialogHeader>
-              <AlertDialogTitle>What would you like to delete?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Select what data to remove. These actions cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
+    <AlertDialog>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+        {/* Checkboxes */}
+        <div className="flex flex-wrap gap-3 flex-1">
+          {[
+            { label: "App Data", desc: "History, settings, audio", checked: deleteAppData, onChange: setDeleteAppData },
+            { label: "AI Models", desc: "Whisper model files", checked: deleteModels, onChange: setDeleteModels },
+            { label: "CUDA Libraries", desc: "cuDNN + cuBLAS", checked: deleteCudaLibs, onChange: setDeleteCudaLibs },
+          ].map(({ label, desc, checked, onChange }) => (
+            <label key={label} className="flex items-start gap-2 p-3 rounded-xl bg-background/40 border border-border/40 cursor-pointer hover:border-destructive/30 transition-colors min-w-[140px]">
+              <Checkbox
+                checked={checked}
+                onCheckedChange={(v) => onChange(v === true)}
+                className="mt-0.5"
+              />
+              <div>
+                <p className="text-xs font-medium">{label}</p>
+                <p className="text-[10px] text-muted-foreground">{desc}</p>
+              </div>
+            </label>
+          ))}
+        </div>
 
-            <div className="space-y-4 py-4">
-              {/* App Data Option */}
-              <label className="flex items-start gap-3 p-3 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors cursor-pointer">
-                <Checkbox
-                  checked={deleteAppData}
-                  onCheckedChange={(checked) => setDeleteAppData(checked === true)}
-                  className="mt-0.5"
-                />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <FolderOpen className="w-4 h-4 text-muted-foreground" />
-                    <span className="font-medium text-sm">App Data</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    History, settings, preferences, audio recordings
-                  </p>
-                  <code className="text-[10px] text-muted-foreground/70 mt-1 block">
-                    %USERPROFILE%\.VoiceFlow\
-                  </code>
-                </div>
-              </label>
-
-              {/* Models Option */}
-              <label className="flex items-start gap-3 p-3 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors cursor-pointer">
-                <Checkbox
-                  checked={deleteModels}
-                  onCheckedChange={(checked) => setDeleteModels(checked === true)}
-                  className="mt-0.5"
-                />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <HardDrive className="w-4 h-4 text-muted-foreground" />
-                    <span className="font-medium text-sm">AI Models</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Downloaded Whisper models (requires re-download)
-                  </p>
-                  <code className="text-[10px] text-muted-foreground/70 mt-1 block">
-                    %USERPROFILE%\.cache\huggingface\hub\
-                  </code>
-                </div>
-              </label>
-
-              {/* CUDA Libraries Option */}
-              <label className="flex items-start gap-3 p-3 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors cursor-pointer">
-                <Checkbox
-                  checked={deleteCudaLibs}
-                  onCheckedChange={(checked) => setDeleteCudaLibs(checked === true)}
-                  className="mt-0.5"
-                />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <Cpu className="w-4 h-4 text-muted-foreground" />
-                    <span className="font-medium text-sm">CUDA Libraries</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    cuDNN + cuBLAS for GPU acceleration (requires re-download)
-                  </p>
-                  <code className="text-[10px] text-muted-foreground/70 mt-1 block">
-                    %USERPROFILE%\.VoiceFlow\cuda\
-                  </code>
-                </div>
-              </label>
-            </div>
-
-            <AlertDialogFooter>
-              <AlertDialogCancel className="rounded-xl">
-                Cancel
-              </AlertDialogCancel>
-              <AlertDialogAction
-                className="bg-destructive text-white hover:bg-destructive/90 rounded-xl disabled:opacity-50"
-                onClick={handleDelete}
-                disabled={!canDelete || isDeleting}
-              >
-                {isDeleting ? "Deleting..." : "Delete Selected"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {/* Delete button */}
+        <AlertDialogTrigger asChild>
+          <button
+            disabled={!canDelete}
+            className="shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl border border-destructive/40 bg-destructive/10 hover:bg-destructive hover:text-white hover:border-destructive transition-all text-sm font-medium text-destructive disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Trash2 className="w-4 h-4" />
+            Reset Selected
+          </button>
+        </AlertDialogTrigger>
       </div>
-    </BentoSettingCard>
+
+      <AlertDialogContent className="glass-strong rounded-2xl">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Confirm deletion</AlertDialogTitle>
+          <AlertDialogDescription>
+            The following will be permanently deleted:{" "}
+            <strong>
+              {[deleteAppData && "app data", deleteModels && "AI models", deleteCudaLibs && "CUDA libraries"]
+                .filter(Boolean).join(", ")}
+            </strong>. This cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-white hover:bg-destructive/90 rounded-xl disabled:opacity-50"
+            onClick={handleDelete}
+            disabled={isDeleting}
+          >
+            {isDeleting ? "Deleting..." : "Delete"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

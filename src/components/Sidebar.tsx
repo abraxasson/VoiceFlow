@@ -30,7 +30,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         setActiveHotkey(null);
       }
     }).catch(() => {});
-  }, [location.pathname]);
+  }, []);
 
   return (
     <aside className="w-64 h-screen bg-sidebar flex flex-col border-r border-sidebar-border relative overflow-hidden">

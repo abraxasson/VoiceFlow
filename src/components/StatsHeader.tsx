@@ -11,25 +11,25 @@ type ConfigData = {
   isUsingGpu: boolean;
 };
 
+type CacheData = { stats: Stats; config: ConfigData | null };
+
+// Module-level cache: populated on first load, reused on subsequent tab visits
+// so the skeleton never flashes again after the first render
+let _cache: CacheData | null = null;
+
 export function StatsHeader() {
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [config, setConfig] = useState<ConfigData | null>(null);
+  const [data, setData] = useState<CacheData | null>(_cache);
 
   useEffect(() => {
     const load = async () => {
       try {
-        // Load stats
         const statsData = await api.getStats();
-        setStats(statsData);
-
-        // Load config (settings + options + GPU info)
         const [settings, options, gpuInfo] = await Promise.all([
           api.getSettings(),
           api.getOptions(),
           api.getGpuInfo(),
         ]);
 
-        // Find mic name
         const currentMic = options.microphones.find(
           (m) => m.id === settings.microphone
         );
@@ -38,33 +38,39 @@ export function StatsHeader() {
             ? "System Default"
             : currentMic?.name || "Unknown Mic";
 
-        // Determine compute device
-        const isUsingGpu = settings.device === "cuda" || (settings.device === "auto" && gpuInfo.cudaAvailable);
+        const isUsingGpu =
+          settings.device === "cuda" ||
+          (settings.device === "auto" && gpuInfo.cudaAvailable);
         const computeDevice = isUsingGpu
           ? gpuInfo.gpuName?.replace("NVIDIA ", "").replace(" Laptop GPU", "") || "CUDA GPU"
           : "CPU";
 
-        setConfig({
-          model: settings.model,
-          language: settings.language,
-          micName: micName,
-          computeDevice,
-          isUsingGpu,
-        });
+        const result: CacheData = {
+          stats: statsData,
+          config: {
+            model: settings.model,
+            language: settings.language,
+            micName,
+            computeDevice,
+            isUsingGpu,
+          },
+        };
+        _cache = result;
+        setData(result);
       } catch (error) {
-        console.error("Failed to load data:", error);
-        setStats({
-          totalTranscriptions: 0,
-          totalWords: 0,
-          totalCharacters: 0,
-          streakDays: 0,
-        });
+        console.error("Failed to load stats:", error);
+        if (!_cache) {
+          setData({
+            stats: { totalTranscriptions: 0, totalWords: 0, totalCharacters: 0, streakDays: 0 },
+            config: null,
+          });
+        }
       }
     };
     load();
   }, []);
 
-  if (!stats) {
+  if (!data) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="md:col-span-2 h-56 rounded-3xl bg-muted/20 animate-pulse" />
@@ -72,6 +78,8 @@ export function StatsHeader() {
       </div>
     );
   }
+
+  const { stats, config } = data;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -138,7 +146,6 @@ export function StatsHeader() {
 
       {/* Active Configuration Card */}
       <div className="glass-card flex flex-col overflow-hidden relative">
-        {/* Header orb */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="orb orb-accent w-[180px] h-[180px] absolute -top-20 -right-20 opacity-30" />
         </div>
@@ -154,18 +161,15 @@ export function StatsHeader() {
           </div>
 
           <div className="space-y-5 mt-auto">
-            {/* Model */}
             <ConfigItem
               icon={Cpu}
               label="Model"
               value={
                 config?.model
                   ? config.model.charAt(0).toUpperCase() + config.model.slice(1)
-                  : "Loading..."
+                  : "—"
               }
             />
-
-            {/* Language */}
             <ConfigItem
               icon={Languages}
               label="Language"
@@ -174,23 +178,19 @@ export function StatsHeader() {
                   ? config.language === "auto"
                     ? "Auto-Detect"
                     : config.language.toUpperCase()
-                  : "Loading..."
+                  : "—"
               }
             />
-
-            {/* Microphone */}
             <ConfigItem
               icon={Mic}
               label="Input"
-              value={config?.micName || "Loading..."}
+              value={config?.micName || "—"}
               truncate
             />
-
-            {/* Compute Device */}
             <ConfigItem
               icon={config?.isUsingGpu ? Zap : Cpu}
               label="Compute"
-              value={config?.computeDevice || "Loading..."}
+              value={config?.computeDevice || "—"}
               highlight={config?.isUsingGpu}
               truncate
             />
