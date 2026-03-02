@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -14,10 +13,8 @@ import {
   Globe,
   Mic,
   Cpu,
-  Zap,
   FolderOpen,
   Trash2,
-  FileAudio,
   Keyboard,
   Hand,
   ToggleRight,
@@ -70,27 +67,23 @@ function Section({
   );
 }
 
-// ─── Uniform setting card ─────────────────────────────────────────────────────
-function SettingCard({
-  title,
+// ─── Setting row (label left, control right) ──────────────────────────────────
+function SettingRow({
+  label,
   description,
   children,
-  className,
 }: {
-  title: string;
+  label: string;
   description?: string;
   children: React.ReactNode;
-  className?: string;
 }) {
   return (
-    <div className={cn("glass-card p-5 flex flex-col gap-4 h-full", className)}>
-      <div>
-        <p className="text-sm font-semibold text-foreground tracking-tight">{title}</p>
-        {description && (
-          <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
-        )}
+    <div className="flex items-center justify-between gap-6 py-3 border-b border-border/10 last:border-0">
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-foreground leading-none">{label}</p>
+        {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
       </div>
-      <div className="flex-1 flex flex-col justify-end">{children}</div>
+      <div className="shrink-0">{children}</div>
     </div>
   );
 }
@@ -243,7 +236,7 @@ export function SettingsTab() {
         <div className="orb orb-accent w-[300px] h-[300px] absolute bottom-20 -left-20 opacity-15" />
       </div>
 
-      <div className="w-full max-w-4xl mx-auto p-6 md:p-10 space-y-10 relative z-10">
+      <div className="w-full max-w-3xl mx-auto p-6 md:p-10 space-y-8 relative z-10">
         {/* Page header */}
         <div className="flex flex-col gap-2">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tighter text-foreground">
@@ -256,12 +249,12 @@ export function SettingsTab() {
 
         <div className="divider-gradient" />
 
-        {/* ── SECTION 1: Transcription ──────────────────────────── */}
+        {/* ── SECTION 1: Transcription ── */}
         <Section icon={Globe} title="Transcription" description="Language, model and processing options">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <SettingCard title="Language" description="Target transcription language">
+          <div className="glass-card px-5 py-1">
+            <SettingRow label="Language" description="Target transcription language">
               <Select value={settings.language} onValueChange={(v) => updateSetting("language", v)}>
-                <SelectTrigger className="h-10 rounded-xl">
+                <SelectTrigger className="h-9 w-44 rounded-lg text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -272,11 +265,10 @@ export function SettingsTab() {
                   ))}
                 </SelectContent>
               </Select>
-            </SettingCard>
-
-            <SettingCard title="AI Model" description="Smaller is faster, larger is more accurate">
+            </SettingRow>
+            <SettingRow label="AI Model" description="Smaller is faster, larger is more accurate">
               <Select value={settings.model} onValueChange={handleModelChange}>
-                <SelectTrigger className="h-10 rounded-xl">
+                <SelectTrigger className="h-9 w-44 rounded-lg text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -287,11 +279,10 @@ export function SettingsTab() {
                   ))}
                 </SelectContent>
               </Select>
-            </SettingCard>
-
-            <SettingCard title="Theme" description="Interface color scheme">
+            </SettingRow>
+            <SettingRow label="Theme" description="Interface color scheme">
               <Select value={settings.theme} onValueChange={(v) => updateSetting("theme", v as Settings["theme"])}>
-                <SelectTrigger className="h-10 rounded-xl">
+                <SelectTrigger className="h-9 w-44 rounded-lg text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -302,23 +293,20 @@ export function SettingsTab() {
                   ))}
                 </SelectContent>
               </Select>
-            </SettingCard>
+            </SettingRow>
           </div>
         </Section>
 
-        {/* ── SECTION 2: Input & History ────────────────────────── */}
+        {/* ── SECTION 2: Input & History ── */}
         <Section icon={Mic} title="Input & History" description="Microphone, data retention and audio recording">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <SettingCard title="Microphone" description="Audio capture device" className="sm:col-span-1">
+          <div className="glass-card px-5 py-1">
+            <SettingRow label="Microphone" description="Audio capture device">
               <Select
                 value={String(settings.microphone)}
                 onValueChange={(v) => updateSetting("microphone", Number(v))}
               >
-                <SelectTrigger className="h-10 rounded-xl">
-                  <div className="flex items-center gap-2">
-                    <Mic className="w-3.5 h-3.5 opacity-50" />
-                    <SelectValue />
-                  </div>
+                <SelectTrigger className="h-9 w-44 rounded-lg text-sm">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="-1">Default System Mic</SelectItem>
@@ -327,14 +315,13 @@ export function SettingsTab() {
                   ))}
                 </SelectContent>
               </Select>
-            </SettingCard>
-
-            <SettingCard title="Data Retention" description="How long to keep transcriptions">
+            </SettingRow>
+            <SettingRow label="Data Retention" description="How long to keep transcriptions">
               <Select
                 value={String(settings.retention)}
                 onValueChange={(v) => updateSetting("retention", Number(v))}
               >
-                <SelectTrigger className="h-10 rounded-xl">
+                <SelectTrigger className="h-9 w-44 rounded-lg text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -343,93 +330,71 @@ export function SettingsTab() {
                   ))}
                 </SelectContent>
               </Select>
-            </SettingCard>
-
-            <SettingCard title="History Audio" description="Store dictation recordings with each entry">
-              <div className="flex items-center justify-between p-3 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors">
-                <div className="flex items-center gap-2">
-                  <FileAudio className="w-4 h-4 text-muted-foreground/70" />
-                  <Label htmlFor="save-audio-history" className="text-sm font-medium cursor-pointer">
-                    Save audio
-                  </Label>
-                </div>
-                <Switch
-                  id="save-audio-history"
-                  checked={settings.saveAudioToHistory}
-                  onCheckedChange={(checked) => updateSetting("saveAudioToHistory", checked)}
-                />
-              </div>
-            </SettingCard>
+            </SettingRow>
+            <SettingRow label="Save Audio" description="Store recordings with each history entry">
+              <Switch
+                checked={settings.saveAudioToHistory}
+                onCheckedChange={(checked) => updateSetting("saveAudioToHistory", checked)}
+              />
+            </SettingRow>
           </div>
         </Section>
 
-        {/* ── SECTION 3: Appearance ─────────────────────────────── */}
+        {/* ── SECTION 3: Appearance & Behavior ── */}
         <Section icon={Activity} title="Appearance & Behavior" description="Popup visualizer and system settings">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-start">
-            {/* Visualizer picker — spans 2 cols */}
-            <SettingCard title="Voice Visualizer" description="Recording animation style" className="sm:col-span-2">
-              <div className="grid grid-cols-4 gap-2">
-                {[
-                  { id: "multiwave", label: "Wave" },
-                  { id: "ring",      label: "Ring" },
-                  { id: "bar",       label: "Equalizer" },
-                  { id: "scope",     label: "Scope" },
-                ].map((viz) => (
-                  <button
-                    key={viz.id}
-                    onClick={() => updateSetting("visualizerStyle", viz.id)}
-                    className={cn(
-                      "flex flex-col items-center gap-1.5 p-2.5 rounded-xl border transition-all",
-                      settings.visualizerStyle === viz.id
-                        ? "border-primary/60 bg-primary/10 text-primary"
-                        : "border-border/40 bg-secondary/20 hover:bg-secondary/40 text-muted-foreground"
-                    )}
-                  >
-                    <VizMiniPreview style={viz.id} />
-                    <span className="text-[10px] font-medium">{viz.label}</span>
-                  </button>
-                ))}
-              </div>
-            </SettingCard>
-
-            {/* Right column: stacked behavior cards */}
-            <div className="flex flex-col gap-4">
-              <SettingCard title="Startup" description="Run automatically with Windows">
-                <div className="flex items-center justify-between p-3 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-muted-foreground/70" />
-                    <Label htmlFor="auto-start" className="text-sm font-medium cursor-pointer">
-                      Auto-start
-                    </Label>
-                  </div>
-                  <Switch
-                    id="auto-start"
-                    checked={settings.autoStart}
-                    onCheckedChange={(checked) => updateSetting("autoStart", checked)}
-                  />
-                </div>
-              </SettingCard>
-
-              <SettingCard title="Storage" description="Browse local data files">
+          <div className="glass-card px-5 py-4">
+            <p className="text-sm font-medium text-foreground leading-none">Voice Visualizer</p>
+            <p className="text-xs text-muted-foreground mt-1 mb-3">Recording animation style</p>
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { id: "multiwave", label: "Wave" },
+                { id: "ring",      label: "Ring" },
+                { id: "bar",       label: "Equalizer" },
+                { id: "scope",     label: "Scope" },
+                { id: "nebula",    label: "Nebula" },
+                { id: "vortex",    label: "Vortex" },
+                { id: "flame",     label: "Flame" },
+                { id: "helix",     label: "Helix" },
+              ].map((viz) => (
+                <button
+                  key={viz.id}
+                  onClick={() => updateSetting("visualizerStyle", viz.id)}
+                  className={cn(
+                    "flex flex-col items-center gap-1.5 p-2.5 rounded-xl border transition-all",
+                    settings.visualizerStyle === viz.id
+                      ? "border-primary/60 bg-primary/10 text-primary"
+                      : "border-border/40 bg-secondary/20 hover:bg-secondary/40 text-muted-foreground"
+                  )}
+                >
+                  <VizMiniPreview style={viz.id} />
+                  <span className="text-[10px] font-medium">{viz.label}</span>
+                </button>
+              ))}
+            </div>
+            <div className="border-t border-border/10 -mx-5 mt-4 px-5">
+              <SettingRow label="Auto-start" description="Run automatically with Windows">
+                <Switch
+                  checked={settings.autoStart}
+                  onCheckedChange={(checked) => updateSetting("autoStart", checked)}
+                />
+              </SettingRow>
+              <SettingRow label="Data Folder" description="Browse saved data and logs">
                 <button
                   onClick={() => api.openDataFolder()}
-                  className="w-full flex items-center justify-between gap-2 h-10 px-3 rounded-xl border border-border/50 bg-background/50 hover:bg-primary/5 hover:border-primary/30 hover:text-primary transition-all text-sm font-medium text-muted-foreground"
+                  className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-border/50 bg-background/50 hover:bg-primary/5 hover:border-primary/30 hover:text-primary transition-all text-xs font-medium text-muted-foreground"
                 >
-                  <div className="flex items-center gap-2">
-                    <FolderOpen className="w-4 h-4" />
-                    Open Data Folder
-                  </div>
-                  <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+                  <FolderOpen className="w-3.5 h-3.5" />
+                  Open
+                  <ChevronRight className="w-3 h-3 opacity-40" />
                 </button>
-              </SettingCard>
+              </SettingRow>
             </div>
           </div>
         </Section>
 
-        {/* ── SECTION 4: Keyboard Shortcuts ─────────────────────── */}
+        {/* ── SECTION 4: Keyboard Shortcuts ── */}
         <Section icon={Keyboard} title="Keyboard Shortcuts" description="Configure recording hotkeys">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Hold Mode */}
             <div className="glass-card p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -453,8 +418,6 @@ export function SettingsTab() {
                 disabled={!settings.holdHotkeyEnabled}
               />
             </div>
-
-            {/* Toggle Mode */}
             <div className="glass-card p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -481,17 +444,12 @@ export function SettingsTab() {
           </div>
         </Section>
 
-        {/* ── SECTION 5: Advanced ───────────────────────────────── */}
+        {/* ── SECTION 5: Advanced ── */}
         <Section icon={Cpu} title="Advanced" description="Hardware and performance configuration">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Compute Device */}
-            <div className="glass-card p-5 space-y-4 h-full">
-              <div>
-                <p className="text-sm font-semibold text-foreground">Compute Device</p>
-                <p className="text-xs text-muted-foreground mt-0.5">CPU or GPU for transcription inference</p>
-              </div>
+          <div className="glass-card px-5 py-1">
+            <SettingRow label="Compute Device" description="CPU or GPU for transcription inference">
               <Select value={settings.device} onValueChange={handleDeviceChange}>
-                <SelectTrigger className="h-10 rounded-xl">
+                <SelectTrigger className="h-9 w-44 rounded-lg text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -510,46 +468,41 @@ export function SettingsTab() {
                   ))}
                 </SelectContent>
               </Select>
-              {deviceError && <p className="text-xs text-destructive">{deviceError}</p>}
-              {gpuInfo && (
-                <div className="p-3 rounded-xl bg-secondary/30 space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Status</span>
-                    <span className={
-                      gpuInfo.cudaAvailable ? "text-green-500"
-                        : gpuInfo.gpuName && !gpuInfo.cudnnAvailable ? "text-amber-500"
-                        : "text-muted-foreground"
-                    }>
-                      {gpuInfo.cudaAvailable ? "CUDA Available"
-                        : gpuInfo.gpuName && !gpuInfo.cudnnAvailable ? "cuDNN Missing"
-                        : "CPU Only"}
-                    </span>
-                  </div>
-                  {gpuInfo.gpuName && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">GPU</span>
-                      <span className="truncate ml-2 max-w-[180px]" title={gpuInfo.gpuName}>
-                        {gpuInfo.gpuName}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Active</span>
-                    <span>{gpuInfo.currentDevice.toUpperCase()} ({gpuInfo.currentComputeType})</span>
-                  </div>
-                  {gpuInfo.gpuName && !gpuInfo.cudnnAvailable && (
-                    <p className="text-xs text-amber-500 pt-1">Install cuDNN 9.x for GPU acceleration</p>
-                  )}
-                </div>
-              )}
+            </SettingRow>
+            {deviceError && <p className="text-xs text-destructive pb-3">{deviceError}</p>}
+            {gpuInfo && (
+              <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs pb-3 -mt-1">
+                <span className={cn(
+                  "font-medium",
+                  gpuInfo.cudaAvailable ? "text-green-500"
+                    : gpuInfo.gpuName && !gpuInfo.cudnnAvailable ? "text-amber-500"
+                    : "text-muted-foreground"
+                )}>
+                  {gpuInfo.cudaAvailable ? "CUDA available"
+                    : gpuInfo.gpuName && !gpuInfo.cudnnAvailable ? "cuDNN missing"
+                    : "CPU only"}
+                </span>
+                {gpuInfo.gpuName && (
+                  <span className="text-muted-foreground truncate max-w-[200px]" title={gpuInfo.gpuName}>
+                    {gpuInfo.gpuName}
+                  </span>
+                )}
+                <span className="text-muted-foreground">
+                  Active: {gpuInfo.currentDevice.toUpperCase()} ({gpuInfo.currentComputeType})
+                </span>
+                {gpuInfo.gpuName && !gpuInfo.cudnnAvailable && (
+                  <span className="text-amber-500">Install cuDNN 9.x for GPU acceleration</span>
+                )}
+              </div>
+            )}
+            <div className="border-t border-border/10 -mx-5 px-5 pt-3 pb-2">
+              <p className="text-sm font-medium text-foreground leading-none mb-3">Model Storage</p>
+              <ModelStorageRows />
             </div>
-
-            {/* Model Storage */}
-            <ModelStorageCard />
           </div>
         </Section>
 
-        {/* ── SECTION 6: Danger Zone ────────────────────────────── */}
+        {/* ── SECTION 6: Danger Zone ── */}
         <div className="border border-destructive/20 rounded-2xl p-5 space-y-4 bg-destructive/5">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-destructive/10 text-destructive">
@@ -633,6 +586,71 @@ function VizMiniPreview({ style }: { style: string }) {
       </svg>
     );
   }
+  if (style === "nebula") {
+    return (
+      <svg width={40} height={40} viewBox="0 0 44 44" style={{ overflow: "hidden" }}>
+        <defs>
+          <filter id="nebmpf"><feGaussianBlur stdDeviation={5} /></filter>
+        </defs>
+        <ellipse cx={13} cy={22} rx={16} ry={12} fill="hsl(285,80%,62%)" opacity={0.7} filter="url(#nebmpf)" />
+        <ellipse cx={32} cy={18} rx={14} ry={10} fill="hsl(195,80%,62%)" opacity={0.65} filter="url(#nebmpf)" />
+        <ellipse cx={22} cy={29} rx={11} ry={8} fill="hsl(45,80%,62%)" opacity={0.6} filter="url(#nebmpf)" />
+      </svg>
+    );
+  }
+  if (style === "vortex") {
+    return (
+      <svg width={40} height={40} viewBox="0 0 44 44">
+        {[2, 5, 9, 13, 18].map((ry, i) => (
+          <ellipse key={i} cx={22} cy={22} rx={Math.min(ry * 3, 20)} ry={ry}
+            fill="none" stroke={`hsl(${255 + i * 7},88%,${72 - i * 10}%)`}
+            strokeWidth={1.2 - i * 0.1} opacity={0.85 - i * 0.12} />
+        ))}
+      </svg>
+    );
+  }
+  if (style === "flame") {
+    const fh = [7, 11, 16, 20, 22, 20, 16, 11, 7, 5];
+    return (
+      <svg width={40} height={40} viewBox="0 0 44 44">
+        <defs>
+          <linearGradient id="mflg" x1="0" x2="0" y1="1" y2="0">
+            <stop offset="0%" stopColor="#500" />
+            <stop offset="50%" stopColor="#e03800" />
+            <stop offset="85%" stopColor="#ff8020" />
+            <stop offset="100%" stopColor="#ffe060" />
+          </linearGradient>
+        </defs>
+        {fh.map((h, i) => {
+          const x = 2 + i * 4;
+          return (
+            <path key={i}
+              d={`M${x - 1.4},44 C${x - 1.4},${44 - h * 0.42} ${x},${44 - h * 0.82} ${x},${44 - h} C${x},${44 - h * 0.82} ${x + 1.4},${44 - h * 0.42} ${x + 1.4},44 Z`}
+              fill="url(#mflg)" opacity={0.88} />
+          );
+        })}
+      </svg>
+    );
+  }
+  if (style === "helix") {
+    return (
+      <svg width={40} height={40} viewBox="0 0 44 44">
+        <defs>
+          <linearGradient id="mhg1" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0%" stopColor="#00d4ff" /><stop offset="100%" stopColor="#0060ff" />
+          </linearGradient>
+          <linearGradient id="mhg2" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0%" stopColor="#ff3878" /><stop offset="100%" stopColor="#ff8020" />
+          </linearGradient>
+        </defs>
+        <path d="M2,22 C8,10 14,10 22,22 C30,34 36,34 42,22" stroke="url(#mhg1)" strokeWidth={2} fill="none" />
+        <path d="M2,22 C8,34 14,34 22,22 C30,10 36,10 42,22" stroke="url(#mhg2)" strokeWidth={2} fill="none" />
+        <line x1={9} y1={13} x2={9} y2={31} stroke="rgba(160,210,255,0.45)" strokeWidth={0.8} />
+        <line x1={22} y1={17} x2={22} y2={27} stroke="rgba(160,210,255,0.45)" strokeWidth={0.8} />
+        <line x1={35} y1={31} x2={35} y2={13} stroke="rgba(160,210,255,0.45)" strokeWidth={0.8} />
+      </svg>
+    );
+  }
   // multiwave
   return (
     <svg width={40} height={40} viewBox="0 0 44 44">
@@ -661,8 +679,8 @@ function VizMiniPreview({ style }: { style: string }) {
   );
 }
 
-// ─── Model Storage Card ───────────────────────────────────────────────────────
-function ModelStorageCard() {
+// ─── Model Storage rows (no card wrapper — used inside Advanced section) ───────
+function ModelStorageRows() {
   const [storageInfo, setStorageInfo] = useState<ModelStorageInfo | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -676,60 +694,46 @@ function ModelStorageCard() {
   const sizeFmt = (mb: number) =>
     mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb.toFixed(0)} MB`;
 
-  return (
-    <div className="glass-card p-5 flex flex-col gap-4 h-full">
-      <div>
-        <p className="text-sm font-semibold text-foreground">Model Storage</p>
-        <p className="text-xs text-muted-foreground mt-0.5">Cached Whisper models — disk and RAM usage</p>
-      </div>
+  if (loading) return <div className="h-10 rounded-lg bg-secondary/30 animate-pulse mb-3" />;
+  if (!storageInfo) return <p className="text-xs text-muted-foreground pb-2">Unable to load storage info</p>;
 
-      {loading ? (
-        <div className="flex-1 rounded-xl bg-secondary/30 animate-pulse min-h-[80px]" />
-      ) : storageInfo ? (
-        <div className="flex flex-col gap-3 flex-1">
-          <div className="flex items-center justify-between text-xs text-muted-foreground px-0.5">
+  return (
+    <div className="space-y-2 pb-1">
+      {storageInfo.models.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No models downloaded yet</p>
+      ) : (
+        <>
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>{storageInfo.models.length} model{storageInfo.models.length !== 1 ? "s" : ""} cached</span>
             <span>Total: <span className="font-medium text-foreground">{sizeFmt(storageInfo.totalSizeMb)}</span></span>
           </div>
-
-          {storageInfo.models.length > 0 ? (
-            <div className="space-y-1.5 max-h-44 overflow-y-auto">
-              {storageInfo.models.map((m) => (
-                <div key={m.name} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-secondary/30">
-                  <span className="font-mono text-xs font-semibold min-w-[80px]">{m.name}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-background/60 border border-border/40 text-muted-foreground whitespace-nowrap">
-                    {sizeFmt(m.sizeMb)}
-                  </span>
-                  <div className="flex-1 flex items-center gap-1.5 min-w-0">
-                    <div className="flex-1 h-1.5 rounded-full bg-secondary overflow-hidden">
-                      <div className="h-full rounded-full bg-primary/70"
-                        style={{ width: `${Math.min(100, (m.ramMb / 6200) * 100)}%` }} />
-                    </div>
-                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                      ~{sizeFmt(m.ramMb)} RAM
-                    </span>
+          <div className="space-y-1.5 max-h-36 overflow-y-auto">
+            {storageInfo.models.map((m) => (
+              <div key={m.name} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-secondary/30">
+                <span className="font-mono text-xs font-semibold min-w-[80px]">{m.name}</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-background/60 border border-border/40 text-muted-foreground whitespace-nowrap">
+                  {sizeFmt(m.sizeMb)}
+                </span>
+                <div className="flex-1 flex items-center gap-1.5 min-w-0">
+                  <div className="flex-1 h-1.5 rounded-full bg-secondary overflow-hidden">
+                    <div className="h-full rounded-full bg-primary/70"
+                      style={{ width: `${Math.min(100, (m.ramMb / 6200) * 100)}%` }} />
                   </div>
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">~{sizeFmt(m.ramMb)} RAM</span>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-4">No models downloaded yet</p>
-          )}
-
-          <button
-            onClick={() => api.openModelFolder()}
-            className="mt-auto w-full flex items-center justify-between h-9 px-3 rounded-xl border border-border/50 bg-background/50 hover:bg-primary/5 hover:border-primary/30 hover:text-primary transition-all text-sm font-medium text-muted-foreground"
-          >
-            <div className="flex items-center gap-2">
-              <Database className="w-3.5 h-3.5" />
-              Open Models Folder
-            </div>
-            <ChevronRight className="w-3.5 h-3.5 opacity-50" />
-          </button>
-        </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">Unable to load storage info</p>
+              </div>
+            ))}
+          </div>
+        </>
       )}
+      <button
+        onClick={() => api.openModelFolder()}
+        className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-border/50 bg-background/50 hover:bg-primary/5 hover:border-primary/30 hover:text-primary transition-all text-xs font-medium text-muted-foreground"
+      >
+        <Database className="w-3.5 h-3.5" />
+        Open Models Folder
+        <ChevronRight className="w-3 h-3 opacity-40" />
+      </button>
     </div>
   );
 }

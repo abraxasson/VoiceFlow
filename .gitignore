@@ -45,3 +45,6 @@ build_error_log.txt
 
 # Input files not to share
 tips
+
+#do not want to share claude settings
+.claude

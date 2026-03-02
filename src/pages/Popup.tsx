@@ -2,7 +2,7 @@ import { useEffect, useState, useLayoutEffect, useRef, useMemo } from "react";
 import { api } from "@/lib/api";
 
 type PopupState = "idle" | "recording" | "processing";
-type VisualizerStyle = "multiwave" | "ring" | "bar" | "scope";
+type VisualizerStyle = "multiwave" | "ring" | "bar" | "scope" | "nebula" | "vortex" | "flame" | "helix";
 
 interface AudioData {
   amplitude: number;
@@ -133,13 +133,13 @@ function MultiWaveViz({ audio, animTime }: { audio: AudioData; animTime: number 
 
   return (
     <div style={{
-      padding: "10px 8px",
-      borderRadius: "24px",
-      background: "#000000",
-      boxShadow: `0 0 ${20 + amplitude * 40}px rgba(80, 180, 255, ${0.15 + amplitude * 0.45})`,
+      padding: "5px 4px",
+      borderRadius: "12px",
+      background: "rgba(0, 0, 0, 0.72)",
+      boxShadow: `0 0 ${10 + amplitude * 20}px rgba(80, 180, 255, ${0.15 + amplitude * 0.45})`,
       cursor: "grab",
     }}>
-      <svg width={SVG_W} height={SVG_H} viewBox={`0 0 ${SVG_W} ${SVG_H}`} overflow="visible"
+      <svg width={SVG_W / 2} height={SVG_H / 2} viewBox={`0 0 ${SVG_W} ${SVG_H}`} overflow="visible"
         style={{ display: "block" }}>
         <defs>
           <linearGradient id="mwGrad" x1="0" x2="1" y1="0" y2="0">
@@ -243,7 +243,7 @@ function RingViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
   const barGlowStd = 3 + amplitude * 8;
 
   return (
-    <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}
+    <svg width={SIZE / 2} height={SIZE / 2} viewBox={`0 0 ${SIZE} ${SIZE}`}
       style={{ cursor: "grab", display: "block" }}>
       <defs>
         {/* Hard circular clip — nothing escapes the circle boundary */}
@@ -403,13 +403,13 @@ function BarViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
 
   return (
     <div style={{
-      padding: "10px 8px",
-      borderRadius: "24px",
-      background: "#000000",
-      boxShadow: `0 0 ${20 + amplitude * 40}px rgba(100, 50, 255, ${0.15 + amplitude * 0.40})`,
+      padding: "5px 4px",
+      borderRadius: "12px",
+      background: "rgba(0, 0, 0, 0.72)",
+      boxShadow: `0 0 ${10 + amplitude * 20}px rgba(100, 50, 255, ${0.15 + amplitude * 0.40})`,
       cursor: "grab",
     }}>
-      <svg width={SVG_W} height={SVG_H} viewBox={`0 0 ${SVG_W} ${SVG_H}`} overflow="visible"
+      <svg width={SVG_W / 2} height={SVG_H / 2} viewBox={`0 0 ${SVG_W} ${SVG_H}`} overflow="visible"
         style={{ display: "block" }}>
         <defs>
           <filter id="barBloom" x="-15%" y="-40%" width="130%" height="180%">
@@ -511,21 +511,21 @@ function ScopeViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
   // Phosphor green, brightens with amplitude
   const phosphorColor = `rgba(0, 255, 110, ${0.85 + amplitude * 0.15})`;
   const glowColor = `rgba(0, 255, 80, ${0.25 + amplitude * 0.55})`;
-  const outerGlow = 14 + amplitude * 32;
+  const outerGlow = 7 + amplitude * 16;
 
   return (
     <div style={{
-      padding: "8px",
-      borderRadius: "20px",
-      background: "linear-gradient(145deg, #000d08, #000810)",
+      padding: "4px",
+      borderRadius: "10px",
+      background: "linear-gradient(145deg, rgba(0,13,8,0.78), rgba(0,8,16,0.78))",
       boxShadow: [
         `0 0 ${outerGlow}px rgba(0,255,80,${0.10 + amplitude * 0.30})`,
-        `inset 0 0 24px rgba(0,20,10,0.9)`,
+        `inset 0 0 12px rgba(0,20,10,0.6)`,
         `inset 0 1px 0 rgba(0,255,80,0.06)`,
       ].join(", "),
       cursor: "grab",
     }}>
-      <svg width={SVG_W} height={SVG_H} viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+      <svg width={SVG_W / 2} height={SVG_H / 2} viewBox={`0 0 ${SVG_W} ${SVG_H}`}
         style={{ display: "block" }}>
         <defs>
           <filter id="scopeGlow" x="-10%" y="-60%" width="120%" height="220%">
@@ -578,6 +578,338 @@ function ScopeViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
         {/* Scanline texture on top */}
         <rect x={0} y={0} width={SVG_W} height={SVG_H}
           fill="url(#scanlines)" opacity={0.4} style={{ pointerEvents: "none" }} />
+      </svg>
+    </div>
+  );
+}
+
+
+// ============================================================================
+// STYLE 5 — Nebula: Drifting aurora blobs of blurred color
+// (soft organic glows driven by frequency band groups — no hard edges,
+//  deep-space atmosphere, six blobs each in a distinct hue)
+// ============================================================================
+function NebulaViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
+  const SVG_W = 460;
+  const SVG_H = 86;
+  const { amplitude, bands } = audio;
+
+  const blobs = useMemo(() => {
+    const groupSize = [4, 3, 3, 4, 3, 3]; // band groups summing to 20
+    let start = 0;
+    const vals = groupSize.map((sz) => {
+      const avg = bands.slice(start, start + sz).reduce((a, b) => a + b, 0) / sz;
+      start += sz;
+      return boost(avg);
+    });
+
+    return vals.map((v, i) => {
+      const pos = i / 5;
+      const idleX = Math.sin(animTime * (0.25 + i * 0.13) + i * 1.4) * 18;
+      const idleY = Math.cos(animTime * (0.18 + i * 0.09) + i * 1.0) * 12;
+      const x = 38 + pos * (SVG_W - 76) + idleX;
+      const y = SVG_H / 2 + idleY + (i % 2 === 0 ? -8 : 8);
+      const rx = 55 + v * 85;
+      const ry = 26 + v * 38;
+      const hues = [285, 195, 330, 215, 45, 155];
+      const opacity = 0.28 + v * 0.52;
+      return { x, y, rx, ry, hue: hues[i], opacity };
+    });
+  }, [bands, amplitude, animTime]);
+
+  const blurR = 14 + amplitude * 22;
+
+  return (
+    <div style={{
+      padding: "4px",
+      borderRadius: "10px",
+      background: "rgba(2, 3, 7, 0.70)",
+      boxShadow: `0 0 ${9 + amplitude * 21}px rgba(120, 60, 255, ${0.10 + amplitude * 0.32})`,
+      cursor: "grab",
+    }}>
+      <svg width={SVG_W / 2} height={SVG_H / 2} viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+        style={{ display: "block", overflow: "hidden" }}>
+        <defs>
+          <filter id="nebBlur">
+            <feGaussianBlur stdDeviation={blurR} />
+          </filter>
+          <filter id="nebCrisp" x="-30%" y="-80%" width="160%" height="260%">
+            <feGaussianBlur stdDeviation={5} result="b" />
+            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+
+        {/* Deep glow layer */}
+        <g filter="url(#nebBlur)">
+          {blobs.map((b, i) => (
+            <ellipse key={`nb${i}`} cx={b.x} cy={b.y} rx={b.rx} ry={b.ry}
+              fill={`hsl(${b.hue},88%,58%)`} opacity={b.opacity} />
+          ))}
+        </g>
+
+        {/* Tighter crisp layer for colour definition */}
+        <g filter="url(#nebCrisp)" opacity={0.45 + amplitude * 0.35}>
+          {blobs.map((b, i) => (
+            <ellipse key={`nc${i}`} cx={b.x} cy={b.y} rx={b.rx * 0.45} ry={b.ry * 0.45}
+              fill={`hsl(${b.hue},100%,75%)`} opacity={b.opacity * 0.6} />
+          ))}
+        </g>
+      </svg>
+    </div>
+  );
+}
+
+
+// ============================================================================
+// STYLE 6 — Vortex: Concentric neon ellipses pulsing from centre
+// (sonar / depth-charge rings in a horizontally stretched aspect,
+//  each ring driven by its own frequency band group, electric blue→violet glow)
+// ============================================================================
+function VortexViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
+  const SVG_W = 460;
+  const SVG_H = 86;
+  const CX = SVG_W / 2;
+  const CY = SVG_H / 2;
+  const MAX_RY = CY - 3;
+  const { amplitude, bands } = audio;
+  const N_RINGS = 10;
+
+  const rings = useMemo(() => {
+    return Array.from({ length: N_RINGS }, (_, i) => {
+      const t = i / (N_RINGS - 1); // 0 = innermost
+      const bandIdx = Math.floor(t * 19);
+      const v = boost(bands[bandIdx] || 0);
+      const idle = (Math.sin(animTime * 2.2 + i * 0.9) * 0.5 + 0.5) * 0.04;
+      const val = Math.max(idle, v);
+
+      const ry = 3 + t * MAX_RY;
+      const rx = ry * 4.6; // stretched to fill wide popup
+      const sw = 0.5 + val * 3.5;
+      // inner: bright white-violet, outer: dim blue
+      const hue = 255 + t * 35; // 255→290 (blue→violet)
+      const lit = 75 - t * 35 + val * 20;
+      const opacity = (0.8 - t * 0.65) + val * 0.6;
+      return { ry, rx, sw, hue, lit, opacity, val };
+    });
+  }, [bands, amplitude, animTime]);
+
+  const glowStd = 3 + amplitude * 6;
+
+  return (
+    <div style={{
+      padding: "4px",
+      borderRadius: "10px",
+      background: "radial-gradient(ellipse 80% 120% at 50% 50%, rgba(3,6,20,0.75) 0%, rgba(1,2,8,0.75) 100%)",
+      boxShadow: `0 0 ${8 + amplitude * 19}px rgba(80, 60, 255, ${0.10 + amplitude * 0.28})`,
+      cursor: "grab",
+    }}>
+      <svg width={SVG_W / 2} height={SVG_H / 2} viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+        style={{ display: "block" }}>
+        <defs>
+          <filter id="vortexGlow" x="-20%" y="-60%" width="140%" height="220%">
+            <feGaussianBlur stdDeviation={glowStd} result="b" />
+            <feComposite in="b" in2="b" operator="arithmetic" k1="0" k2="1.8" k3="0" k4="0" result="bright" />
+            <feMerge><feMergeNode in="bright" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+
+        {/* Glow pass */}
+        <g filter="url(#vortexGlow)" opacity={0.5 + amplitude * 0.4}>
+          {rings.map((r, i) => (
+            <ellipse key={`vg${i}`} cx={CX} cy={CY} rx={Math.min(r.rx, SVG_W / 2 - 2)} ry={r.ry}
+              fill="none"
+              stroke={`hsl(${r.hue},90%,${r.lit}%)`}
+              strokeWidth={r.sw + 1} opacity={r.opacity * 0.6} />
+          ))}
+        </g>
+
+        {/* Crisp rings */}
+        {rings.map((r, i) => (
+          <ellipse key={`vc${i}`} cx={CX} cy={CY} rx={Math.min(r.rx, SVG_W / 2 - 2)} ry={r.ry}
+            fill="none"
+            stroke={`hsl(${r.hue},90%,${r.lit}%)`}
+            strokeWidth={r.sw} opacity={r.opacity} />
+        ))}
+
+        {/* Central spark */}
+        <circle cx={CX} cy={CY} r={2 + amplitude * 4}
+          fill={`rgba(200,180,255,${0.5 + amplitude * 0.5})`}
+          filter="url(#vortexGlow)" />
+      </svg>
+    </div>
+  );
+}
+
+
+// ============================================================================
+// STYLE 7 — Flame: Rising fire tongues driven by frequency bands
+// (24 organic bezier flame shapes rising from baseline, deep crimson→orange
+//  →gold tips with bloom glow, idle flicker animation)
+// ============================================================================
+const FLAME_COUNT = 24;
+
+function FlameViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
+  const SVG_W = 460;
+  const SVG_H = 86;
+  const { amplitude, bands } = audio;
+
+  const flames = useMemo(() => {
+    const hiBands = interpolateBands(bands, FLAME_COUNT);
+    return hiBands.map((v, i) => {
+      const pos = i / (FLAME_COUNT - 1);
+      const x = pos * SVG_W;
+      const boosted = boost(v);
+      const flicker = (
+        Math.sin(animTime * 5.5 + i * 1.4) * 0.09 +
+        Math.sin(animTime * 9.0 + i * 2.3) * 0.05
+      );
+      const h = Math.max(2.5, (boosted + Math.abs(flicker)) * (SVG_H - 4));
+      const sway = Math.sin(animTime * 2.2 + i * 0.9) * 5 * boosted;
+      return { x, h, sway, val: boosted };
+    });
+  }, [bands, amplitude, animTime]);
+
+  const bw = SVG_W / FLAME_COUNT * 0.88;
+  const glowStd = 3 + amplitude * 6;
+
+  return (
+    <div style={{
+      padding: "4px",
+      borderRadius: "10px",
+      background: "rgba(6, 1, 0, 0.72)",
+      boxShadow: `0 0 ${10 + amplitude * 25}px rgba(255, 100, 0, ${0.12 + amplitude * 0.38})`,
+      cursor: "grab",
+    }}>
+      <svg width={SVG_W / 2} height={SVG_H / 2} viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+        style={{ display: "block" }}>
+        <defs>
+          <linearGradient id="flameGrad" x1="0" x2="0" y1="1" y2="0"
+            gradientUnits="objectBoundingBox">
+            <stop offset="0%"   stopColor="#1a0500" />
+            <stop offset="25%"  stopColor="#8b1200" />
+            <stop offset="55%"  stopColor="#e03800" />
+            <stop offset="78%"  stopColor="#ff7010" />
+            <stop offset="92%"  stopColor="#ffc030" />
+            <stop offset="100%" stopColor="#fff8a0" stopOpacity={0.85} />
+          </linearGradient>
+          <filter id="flameBloom" x="-25%" y="-60%" width="150%" height="220%">
+            <feGaussianBlur stdDeviation={glowStd} result="b" />
+            <feComposite in="b" in2="b" operator="arithmetic" k1="0" k2="1.6" k3="0" k4="0" result="bright" />
+            <feMerge><feMergeNode in="bright" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+
+        {/* Glow layer */}
+        <g filter="url(#flameBloom)" opacity={0.55 + amplitude * 0.35}>
+          {flames.map((f, i) => {
+            const tipX = f.x + f.sway;
+            const tipY = SVG_H - f.h;
+            const d = `M ${f.x - bw * 0.5} ${SVG_H} C ${f.x - bw * 0.5} ${SVG_H - f.h * 0.38}, ${tipX - bw * 0.18} ${tipY + f.h * 0.3}, ${tipX} ${tipY} C ${tipX + bw * 0.18} ${tipY + f.h * 0.3}, ${f.x + bw * 0.5} ${SVG_H - f.h * 0.38}, ${f.x + bw * 0.5} ${SVG_H} Z`;
+            return <path key={`fg${i}`} d={d} fill="url(#flameGrad)" opacity={0.6 + f.val * 0.3} />;
+          })}
+        </g>
+
+        {/* Crisp flames */}
+        {flames.map((f, i) => {
+          const tipX = f.x + f.sway;
+          const tipY = SVG_H - f.h;
+          const d = `M ${f.x - bw * 0.5} ${SVG_H} C ${f.x - bw * 0.5} ${SVG_H - f.h * 0.38}, ${tipX - bw * 0.18} ${tipY + f.h * 0.3}, ${tipX} ${tipY} C ${tipX + bw * 0.18} ${tipY + f.h * 0.3}, ${f.x + bw * 0.5} ${SVG_H - f.h * 0.38}, ${f.x + bw * 0.5} ${SVG_H} Z`;
+          return <path key={`fc${i}`} d={d} fill="url(#flameGrad)" opacity={0.75 + f.val * 0.25} />;
+        })}
+      </svg>
+    </div>
+  );
+}
+
+
+// ============================================================================
+// STYLE 8 — Helix: DNA double-helix waveform
+// (two interweaving sinusoidal strands with connecting rungs, cyan/blue and
+//  rose/orange complementary pair, amplitude drives strand spread,
+//  phase slowly rotates so it appears to spin)
+// ============================================================================
+const HELIX_POINTS = 64;
+
+function HelixViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
+  const SVG_W = 460;
+  const SVG_H = 86;
+  const CY = SVG_H / 2;
+  const { amplitude, bands } = audio;
+
+  const { s1, s2, rungs } = useMemo(() => {
+    const phase = animTime * 0.9;
+    const turns = 3.0;
+    const maxSpread = 14 + amplitude * 24;
+
+    const s1: Array<[number, number]> = [];
+    const s2: Array<[number, number]> = [];
+
+    for (let i = 0; i < HELIX_POINTS; i++) {
+      const t = i / (HELIX_POINTS - 1);
+      const x = t * SVG_W;
+      const bandIdx = Math.floor(t * 19);
+      const v = boost(bands[bandIdx] || 0);
+      const spread = maxSpread * (0.35 + v * 0.65);
+      const angle = t * Math.PI * 2 * turns + phase;
+      s1.push([x, CY + Math.sin(angle) * spread]);
+      s2.push([x, CY + Math.sin(angle + Math.PI) * spread]);
+    }
+
+    // Rungs every ~6 points (where strands are closest / crossing)
+    const rungs: Array<{ x: number; y1: number; y2: number; v: number }> = [];
+    for (let i = 0; i < HELIX_POINTS; i += 6) {
+      const bandIdx = Math.floor((i / HELIX_POINTS) * 19);
+      rungs.push({ x: s1[i][0], y1: s1[i][1], y2: s2[i][1], v: boost(bands[bandIdx] || 0) });
+    }
+
+    return { s1, s2, rungs };
+  }, [bands, amplitude, animTime]);
+
+  const glowStd = 2.5 + amplitude * 6;
+
+  return (
+    <div style={{
+      padding: "4px",
+      borderRadius: "10px",
+      background: "rgba(1, 5, 8, 0.72)",
+      boxShadow: `0 0 ${8 + amplitude * 19}px rgba(0, 180, 255, ${0.10 + amplitude * 0.30})`,
+      cursor: "grab",
+    }}>
+      <svg width={SVG_W / 2} height={SVG_H / 2} viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+        style={{ display: "block" }}>
+        <defs>
+          <linearGradient id="helixS1" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0%"   stopColor="#00d4ff" />
+            <stop offset="50%"  stopColor="#0060ff" />
+            <stop offset="100%" stopColor="#00d4ff" />
+          </linearGradient>
+          <linearGradient id="helixS2" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0%"   stopColor="#ff3878" />
+            <stop offset="50%"  stopColor="#ff8020" />
+            <stop offset="100%" stopColor="#ff3878" />
+          </linearGradient>
+          <filter id="helixGlow" x="-10%" y="-100%" width="120%" height="300%">
+            <feGaussianBlur stdDeviation={glowStd} result="b" />
+            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+
+        {/* Rungs */}
+        {rungs.map((r, i) => (
+          <line key={`rg${i}`} x1={r.x} y1={r.y1} x2={r.x} y2={r.y2}
+            stroke={`rgba(160,210,255,${0.12 + r.v * 0.42})`}
+            strokeWidth={0.7 + r.v * 1.8} />
+        ))}
+
+        {/* Glow strands */}
+        <g filter="url(#helixGlow)" opacity={0.5 + amplitude * 0.38}>
+          <path d={crPath(s1)} stroke="url(#helixS1)" strokeWidth={4.5} fill="none" />
+          <path d={crPath(s2)} stroke="url(#helixS2)" strokeWidth={4.5} fill="none" />
+        </g>
+
+        {/* Crisp strands */}
+        <path d={crPath(s1)} stroke="url(#helixS1)" strokeWidth={1.8} fill="none" opacity={0.9} />
+        <path d={crPath(s2)} stroke="url(#helixS2)" strokeWidth={1.8} fill="none" opacity={0.9} />
       </svg>
     </div>
   );
@@ -678,10 +1010,14 @@ export function Popup() {
       {/* RECORDING: Visualizer */}
       {state === "recording" && (
         <>
-          {vizStyle === "ring" && <RingViz audio={audio} animTime={animTime} />}
-          {vizStyle === "bar" && <BarViz audio={audio} animTime={animTime} />}
-          {vizStyle === "scope" && <ScopeViz audio={audio} animTime={animTime} />}
-          {(vizStyle === "multiwave" || !["ring", "bar", "scope"].includes(vizStyle)) && (
+          {vizStyle === "ring"   && <RingViz   audio={audio} animTime={animTime} />}
+          {vizStyle === "bar"    && <BarViz    audio={audio} animTime={animTime} />}
+          {vizStyle === "scope"  && <ScopeViz  audio={audio} animTime={animTime} />}
+          {vizStyle === "nebula" && <NebulaViz audio={audio} animTime={animTime} />}
+          {vizStyle === "vortex" && <VortexViz audio={audio} animTime={animTime} />}
+          {vizStyle === "flame"  && <FlameViz  audio={audio} animTime={animTime} />}
+          {vizStyle === "helix"  && <HelixViz  audio={audio} animTime={animTime} />}
+          {(vizStyle === "multiwave" || !["ring","bar","scope","nebula","vortex","flame","helix"].includes(vizStyle)) && (
             <MultiWaveViz audio={audio} animTime={animTime} />
           )}
         </>
@@ -692,7 +1028,7 @@ export function Popup() {
         <div style={{
           display: "flex", alignItems: "center", gap: "5px",
           padding: "8px 14px", borderRadius: "14px",
-          background: "#000000",
+          background: "rgba(0, 0, 0, 0.72)",
         }}>
           {[0, 1, 2].map((i) => (
             <div key={i} style={{

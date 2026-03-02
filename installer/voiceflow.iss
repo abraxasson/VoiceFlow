@@ -2,7 +2,7 @@
 ; Creates a Windows installer from the PyInstaller --onedir output
 
 #define MyAppName "VoiceFlow"
-#define MyAppVersion "1.3.2"
+#define MyAppVersion "1.4.0"
 #define MyAppPublisher "VoiceFlow"
 #define MyAppURL "https://github.com/abraxasson/voiceflow"
 #define MyAppExeName "VoiceFlow.exe"

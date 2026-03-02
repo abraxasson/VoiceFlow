@@ -131,10 +131,44 @@ app.set_tray_actions({
     TrayEvent.DoubleClick: show_dashboard,
 })
 
+def quit_app():
+    """Force-quit: clean up WebEngine pages then defer exit so Qt doesn't warn
+    'Release of profile requested but WebEnginePage still not deleted'."""
+    log.info("Quit requested via tray menu")
+    qapp = QApplication.instance()
+
+    # Schedule page deletion BEFORE exit so the profile isn't torn down while
+    # pages still hold a reference to it.
+    for win in [popup_window, window]:
+        try:
+            if win is not None:
+                wv = win._window.web_view
+                wv.stop()
+                wv.page().deleteLater()
+        except Exception:
+            pass
+
+    # Hide windows immediately so they disappear from the user's view.
+    try:
+        qw = _popup_qwindow()
+        if qw is not None:
+            qw.hide()
+    except Exception:
+        pass
+    try:
+        if window is not None:
+            window._window._window.hide()
+    except Exception:
+        pass
+
+    # Defer exit by one event-loop tick so Qt processes the deleteLater()
+    # calls above before the application (and its profile) is torn down.
+    QTimer.singleShot(0, lambda: qapp.exit(0))
+
 app.set_tray_menu_items([
     {"label": "Open Dashboard", "callback": show_dashboard},
     {"label": "Settings", "callback": open_settings},
-    {"label": "Quit", "callback": app.quit},
+    {"label": "Quit", "callback": quit_app},
 ])
 
 
@@ -145,13 +179,13 @@ from PySide6.QtGui import QColor, QCursor
 from PySide6.QtWidgets import QApplication
 
 # Popup dimensions
-POPUP_IDLE_WIDTH = 110
-POPUP_IDLE_HEIGHT = 18
+POPUP_IDLE_WIDTH = 55
+POPUP_IDLE_HEIGHT = 9
 # Active sizes per visualizer style
-POPUP_PILL_W = 490    # multiwave and bar (460 SVG + 16 padding + margin)
-POPUP_PILL_H = 110
-POPUP_RING_W = 155    # ring (148 SVG + margin)
-POPUP_RING_H = 155
+POPUP_PILL_W = 245    # multiwave and bar (230 display SVG + padding)
+POPUP_PILL_H = 55
+POPUP_RING_W = 78     # ring (74 display SVG + margin)
+POPUP_RING_H = 78
 
 
 def get_popup_dims(style: str) -> tuple:
