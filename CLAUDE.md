@@ -45,7 +45,7 @@ Python backend using Pyloid framework with PySide6:
 - **app_controller.py** - Singleton controller orchestrating all services. Handles hotkey activate/deactivate flow: start recording -> stop recording -> transcribe -> paste at cursor -> save to history.
 
 **Services (src-pyloid/services/):**
-- `audio.py` - Microphone recording using sounddevice. Computes 20 log-spaced FFT frequency bands (80–3500 Hz) with per-band EMA smoothing. Sends `[amplitude, band0..band19]` list to frontend for spectrum visualizer.
+- `audio.py` - Microphone recording using sounddevice. Computes 20 log-spaced FFT frequency bands (80–3500 Hz) with per-band EMA smoothing. Sends dict `{"amplitude": float, "bands": [20 floats], "samples": [64 floats]}` to frontend for spectrum visualizer.
 - `transcription.py` - faster-whisper model loading and transcription
 - `hotkey.py` - Global hotkey listener using keyboard library
 - `clipboard.py` - Clipboard operations and paste-at-cursor using pyautogui
@@ -66,6 +66,7 @@ React 18 + TypeScript + Vite frontend:
   - `ModelDownloadProgress.tsx` - Download progress UI with progress bar, speed, ETA, and retry support
   - `ModelDownloadModal.tsx` - Dialog wrapper for model downloads triggered from settings
   - `ModelRecoveryModal.tsx` - Startup modal for missing model recovery
+  - `SettingsTab.tsx` - Settings page using `SettingRow` flat-row pattern (label left, control right) inside one `glass-card` per section. Visualizer picker shows all 8 styles in a 4-column grid with mini SVG previews.
 
 ### Frontend-Backend Communication
 
@@ -128,9 +129,14 @@ For transparent popup windows on Windows:
 - **Domain logging**: All services use `get_logger(domain)` for structured logging with domains like `model`, `audio`, `hotkey`, etc.
 - **Custom hotkeys**: Supports modifier-only combos (e.g., Ctrl+Win), standard combos (e.g., Ctrl+R), and single function keys (F1–F12). Frontend captures keys, backend validates and registers.
 - **Window geometry persistence**: `save_window_geometry()` in `SettingsService` stores size/position in DB. Restored via direct `QMainWindow.resize()/move()` calls (not Pyloid wrappers) after `setWindowFlags()+show()` to avoid Windows position reset.
-- **Spectrum visualizer**: `audio.py` sends `[amplitude, band0..band19]` per audio chunk. `Popup.tsx` renders SVG catmull-rom waveform with warm→cool gradient. Popup positioned at top of screen; position set after `setWindowFlags()+show()`.
+- **Spectrum visualizer**: `audio.py` sends `{"amplitude": float, "bands": [...], "samples": [...]}` dict per chunk. `Popup.tsx` supports 8 visualizer styles (`multiwave`, `ring`, `bar`, `scope`, `nebula`, `vortex`, `flame`, `helix`) selected via `visualizerStyle` setting. All pill SVGs use `width={SVG_W/2} height={SVG_H/2}` with full `viewBox` so coordinate math stays unchanged. All viz backgrounds use semi-transparent `rgba(...)` values (~0.70–0.78 alpha) so the desktop shows through. Popup positioned at top of screen; position set after `setWindowFlags()+show()`.
+- **Popup warm-parking**: The popup window is kept permanently shown at `(-32000, -32000)` off-screen (not hidden/destroyed) so Qt WebEngine's renderer stays warm. This prevents the ~200–400 ms flash/blank that occurs when a hidden WebEngine window must re-initialize its renderer on first show.
+- **Popup dimensions** (in `main.py`): `POPUP_IDLE_WIDTH=55`, `POPUP_IDLE_HEIGHT=9`, `POPUP_PILL_W=245`, `POPUP_PILL_H=55`, `POPUP_RING_W=78`, `POPUP_RING_H=78`. These control the Qt window size; React fills 100% of the window.
 - **Minimize to tray**: `WindowGeometryFilter` event filter intercepts `WindowStateChange`; minimized state triggers `window.hide()` via `QTimer.singleShot(0, ...)`.
-- **Pro Tip hotkey**: `Sidebar.tsx` re-fetches settings on every route change via `useLocation` so displayed hotkey stays current after settings changes.
+- **Pro Tip hotkey**: `Sidebar.tsx` fetches settings once on mount (`useEffect` with `[]`) to show the active hotkey. Settings are re-fetched by re-mounting (navigating away and back).
+- **SettingRow pattern**: `SettingsTab.tsx` uses a `SettingRow` component (label+description left, control right) with `border-b` separators inside a single `glass-card px-5 py-1` per section. Avoids nested glass-cards per individual setting.
+- **ModelStorageRows**: Model storage info (path, size, clear-cache) renders as `SettingRow`s without its own card wrapper, merged into the Advanced section card.
+- **quit_app() WebEngine cleanup**: To avoid Qt warning "Release of profile requested but WebEnginePage still not deleted", `quit_app()` calls `wv.stop()` and `wv.page().deleteLater()` for each window, then schedules exit via `QTimer.singleShot(0, lambda: qapp.exit(0))` so deferred deletions fire before profile teardown.
 - **Path alias**: Frontend uses `@/` for `src/` imports (configured in tsconfig.json and vite.config.ts)
 
 ## Testing

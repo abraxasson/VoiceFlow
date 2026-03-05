@@ -129,6 +129,15 @@ class HotkeyService:
         self._toggle_hotkey: str = "ctrl+shift+win"
         self._toggle_hotkey_enabled: bool = False
 
+        # Stored hook references for targeted removal (avoids unhook_all)
+        self._registered_hotkeys: list = []
+        self._registered_release_hooks: list = []
+
+        # Watchdog timer — periodically re-registers hotkeys in case Windows
+        # silently drops the low-level keyboard hook (LowLevelHooksTimeout)
+        self._watchdog_timer: Optional[threading.Timer] = None
+        self._WATCHDOG_INTERVAL = 30.0  # seconds
+
     def set_callbacks(
         self,
         on_activate: Callable[[], None],
@@ -276,52 +285,103 @@ class HotkeyService:
 
     # Hotkey registration
     def _register_hotkeys(self):
-        """Register all enabled hotkeys."""
+        """Register all enabled hotkeys and start the watchdog."""
         if self._hold_hotkey_enabled and self._hold_hotkey:
             self._register_hold_hotkey()
         if self._toggle_hotkey_enabled and self._toggle_hotkey:
             self._register_toggle_hotkey()
+        self._start_watchdog()
 
     def _unregister_hotkeys(self):
-        """Unregister all hotkeys and release handlers."""
-        try:
-            keyboard.unhook_all()
-        except Exception as e:
-            log.error("Failed to unregister hotkeys", error=str(e))
+        """Unregister only VoiceFlow's hotkeys using stored references."""
+        self._stop_watchdog()
+        # Remove hotkey handlers by stored reference
+        for hk in self._registered_hotkeys:
+            try:
+                keyboard.remove_hotkey(hk)
+            except Exception:
+                pass
+        self._registered_hotkeys.clear()
+        # Remove release hooks by stored reference
+        for hook in self._registered_release_hooks:
+            try:
+                keyboard.unhook(hook)
+            except Exception:
+                pass
+        self._registered_release_hooks.clear()
 
     def _register_hold_hotkey(self):
         """Register hold-to-record hotkey with press/release handling."""
         log.info("Registering hold hotkey", hotkey=self._hold_hotkey)
         try:
-            keyboard.add_hotkey(self._hold_hotkey, self._on_hold_press, suppress=False)
+            hk = keyboard.add_hotkey(self._hold_hotkey, self._on_hold_press, suppress=False)
+            self._registered_hotkeys.append(hk)
 
             # Monitor key releases to detect when user lets go
             keys = self._parse_hotkey_keys(self._hold_hotkey)
             for key in keys:
                 try:
-                    keyboard.on_release_key(key, self._check_hold_release)
+                    hook = keyboard.on_release_key(key, self._check_hold_release)
+                    self._registered_release_hooks.append(hook)
                     # Also register windows key variants
                     if key == 'win':
-                        keyboard.on_release_key('windows', self._check_hold_release)
-                        keyboard.on_release_key('left windows', self._check_hold_release)
-                        keyboard.on_release_key('right windows', self._check_hold_release)
+                        for win_alias in ('windows', 'left windows', 'right windows'):
+                            try:
+                                h = keyboard.on_release_key(win_alias, self._check_hold_release)
+                                self._registered_release_hooks.append(h)
+                            except Exception:
+                                pass
                 except Exception as e:
                     log.warning("Failed to register release handler for key", key=key, error=str(e))
 
             log.info("Hold hotkey registered successfully", hotkey=self._hold_hotkey)
         except Exception as e:
             log.error("Failed to register hold hotkey", hotkey=self._hold_hotkey, error=str(e))
-            # Don't crash - just log the error and continue without this hotkey
 
     def _register_toggle_hotkey(self):
         """Register toggle hotkey - single press toggles recording."""
         log.info("Registering toggle hotkey", hotkey=self._toggle_hotkey)
         try:
-            keyboard.add_hotkey(self._toggle_hotkey, self._on_toggle_press, suppress=False)
+            hk = keyboard.add_hotkey(self._toggle_hotkey, self._on_toggle_press, suppress=False)
+            self._registered_hotkeys.append(hk)
             log.info("Toggle hotkey registered successfully", hotkey=self._toggle_hotkey)
         except Exception as e:
             log.error("Failed to register toggle hotkey", hotkey=self._toggle_hotkey, error=str(e))
-            # Don't crash - just log the error and continue without this hotkey
+
+    # Watchdog — re-registers hotkeys if Windows silently drops the hook
+    def _start_watchdog(self):
+        """Schedule the next watchdog check."""
+        self._stop_watchdog()
+        self._watchdog_timer = threading.Timer(self._WATCHDOG_INTERVAL, self._watchdog_tick)
+        self._watchdog_timer.daemon = True
+        self._watchdog_timer.start()
+
+    def _stop_watchdog(self):
+        if self._watchdog_timer:
+            self._watchdog_timer.cancel()
+            self._watchdog_timer = None
+
+    def _watchdog_tick(self):
+        """Periodically called to verify hooks are still alive; re-registers if not."""
+        if not self._running:
+            return
+        # A simple liveness probe: check whether our registered hotkeys are still
+        # tracked by the keyboard library. keyboard._hotkeys is the internal dict.
+        try:
+            active = set(keyboard._hotkeys.keys()) if hasattr(keyboard, '_hotkeys') else None
+        except Exception:
+            active = None
+
+        if active is not None and not any(hk in active for hk in self._registered_hotkeys):
+            log.warning("Hotkeys appear to have been dropped by Windows, re-registering")
+            # Clear stale references (hooks are already gone)
+            self._registered_hotkeys.clear()
+            self._registered_release_hooks.clear()
+            self._register_hotkeys()
+            return  # _register_hotkeys restarts the watchdog
+
+        log.debug("Hotkey watchdog: hooks still active")
+        self._start_watchdog()  # schedule next check
 
     # Public API
     def start(self):
@@ -330,6 +390,8 @@ class HotkeyService:
             return
 
         self._running = True
+        self._registered_hotkeys.clear()
+        self._registered_release_hooks.clear()
         self._register_hotkeys()
 
     def stop(self):
