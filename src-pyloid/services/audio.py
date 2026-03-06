@@ -51,6 +51,12 @@ class AudioService:
         if status:
             log.warning("Audio status warning", status=str(status))
 
+        try:
+            self._process_audio_chunk(indata)
+        except Exception as e:
+            log.error("Audio callback error", error=str(e))
+
+    def _process_audio_chunk(self, indata):
         # Copy audio data
         audio_chunk = indata.copy().flatten()
         self._audio_queue.put(audio_chunk)

@@ -126,7 +126,12 @@ class AppController:
 
         if self._on_recording_start:
             self._on_recording_start()
-        self.audio_service.start_recording()
+        try:
+            self.audio_service.start_recording()
+        except Exception as e:
+            error(f"Failed to start recording: {e}")
+            if self._on_transcription_complete:
+                self._on_transcription_complete("")
 
     def _handle_hotkey_deactivate(self):
         """Called when hotkey is released."""
@@ -138,6 +143,8 @@ class AppController:
 
         if len(audio) == 0:
             warning("No audio recorded")
+            if self._on_transcription_complete:
+                self._on_transcription_complete("")
             return
 
         info(f"Recorded {len(audio)} samples")
