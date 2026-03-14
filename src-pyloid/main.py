@@ -115,6 +115,13 @@ controller = get_controller()
 # Store reference to popup window
 popup_window = None
 
+# In-flight session counter. Incremented on recording_start, decremented on
+# transcription_complete.  Popup is only parked when counter reaches 0.
+# This prevents a stale transcription_complete from an earlier session from
+# tearing down the popup while a newer session is active.
+# Managed exclusively by signal slots (main-thread) to avoid cross-thread races.
+_inflight_sessions = 0
+
 
 def show_dashboard():
     app.show_and_focus_main_window()
@@ -384,7 +391,9 @@ def send_popup_event(name, detail):
 
 def _on_recording_start_slot():
     """Slot: Actual recording start handler - runs on main thread via signal."""
-    log.info("Recording started")
+    global _inflight_sessions
+    _inflight_sessions += 1
+    log.info("Recording started", inflight=_inflight_sessions)
     style = controller.get_settings().get("visualizerStyle", "multiwave")
     w, h = get_popup_dims(style)
     show_popup(w, h)
@@ -397,8 +406,7 @@ def on_recording_start():
 
 def _on_recording_stop_slot():
     """Slot: Actual recording stop handler - runs on main thread via signal."""
-    log.info("Recording stopped - processing")
-    # Keep active size during processing
+    log.info("Recording stopped - processing", inflight=_inflight_sessions)
     send_popup_event('popup-state', {'state': 'processing'})
 
 def on_recording_stop():
@@ -408,7 +416,15 @@ def on_recording_stop():
 
 def _on_transcription_complete_slot(text: str):
     """Slot: Actual transcription complete handler - runs on main thread via signal."""
-    log.info("Transcription complete", text_length=len(text))
+    global _inflight_sessions
+    _inflight_sessions = max(0, _inflight_sessions - 1)
+    log.info("Transcription complete", text_length=len(text), inflight=_inflight_sessions)
+    # Only tear down the popup when all in-flight sessions are done.
+    # This prevents a stale completion from an earlier recording from
+    # parking the popup while a newer recording/processing is active.
+    if _inflight_sessions > 0:
+        log.info("Skipping popup park — other session(s) still in flight")
+        return
     send_popup_event('popup-state', {'state': 'idle'})
     qw = _popup_qwindow()
     if qw is not None:

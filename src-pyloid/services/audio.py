@@ -110,15 +110,20 @@ class AudioService:
                 break
 
         log.info("Starting recording", device_id=self._device_id)
-        self._stream = sd.InputStream(
-            samplerate=self.SAMPLE_RATE,
-            channels=self.CHANNELS,
-            dtype=self.DTYPE,
-            callback=self._audio_callback,
-            blocksize=self.CHUNK_SIZE,
-            device=self._device_id,
-        )
-        self._stream.start()
+        try:
+            self._stream = sd.InputStream(
+                samplerate=self.SAMPLE_RATE,
+                channels=self.CHANNELS,
+                dtype=self.DTYPE,
+                callback=self._audio_callback,
+                blocksize=self.CHUNK_SIZE,
+                device=self._device_id,
+            )
+            self._stream.start()
+        except Exception:
+            # Reset flag so the next attempt isn't silently blocked
+            self._recording = False
+            raise
         log.debug("Recording started")
 
     def stop_recording(self) -> np.ndarray:
