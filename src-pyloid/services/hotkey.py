@@ -200,8 +200,12 @@ class HotkeyService:
 
         self._hold_active = True
         log.info("Hold hotkey activated")
-        if self._on_activate:
-            self._on_activate()
+        try:
+            if self._on_activate:
+                self._on_activate()
+        except Exception as e:
+            log.error("Exception in hold activate callback", error=str(e))
+            self._hold_active = False  # Roll back so the next press works
 
     def _check_hold_release(self, event):
         """Check if hold hotkey should be deactivated on key release."""
@@ -223,7 +227,11 @@ class HotkeyService:
 
         if not all_pressed:
             log.debug("Hold key released", key=event.name)
-            self._deactivate_hold()
+            try:
+                self._deactivate_hold()
+            except Exception as e:
+                log.error("Exception in hold deactivate callback", error=str(e))
+                self._hold_active = False  # Force reset so next press works
 
     def _deactivate_hold(self):
         """Deactivate hold mode recording."""
@@ -241,15 +249,19 @@ class HotkeyService:
         if self._hold_active:
             return  # Hold mode is active, ignore toggle
 
-        if not self._toggle_active:
-            # Start recording
-            self._toggle_active = True
-            log.info("Toggle hotkey activated - recording started")
-            if self._on_activate:
-                self._on_activate()
-        else:
-            # Stop recording
-            self._deactivate_toggle()
+        try:
+            if not self._toggle_active:
+                # Start recording
+                self._toggle_active = True
+                log.info("Toggle hotkey activated - recording started")
+                if self._on_activate:
+                    self._on_activate()
+            else:
+                # Stop recording
+                self._deactivate_toggle()
+        except Exception as e:
+            log.error("Exception in toggle callback", error=str(e))
+            self._toggle_active = False  # Force reset so next press works
 
     def _deactivate_toggle(self):
         """Deactivate toggle mode recording."""
@@ -362,26 +374,26 @@ class HotkeyService:
             self._watchdog_timer = None
 
     def _watchdog_tick(self):
-        """Periodically called to verify hooks are still alive; re-registers if not."""
+        """Periodically re-register hotkeys to recover from Windows silently dropping
+        the low-level keyboard hook (LowLevelHooksTimeout).
+
+        Skips re-registration while a recording is active to avoid missing the
+        key-release event that stops recording.
+        """
         if not self._running:
             return
-        # A simple liveness probe: check whether our registered hotkeys are still
-        # tracked by the keyboard library. keyboard._hotkeys is the internal dict.
-        try:
-            active = set(keyboard._hotkeys.keys()) if hasattr(keyboard, '_hotkeys') else None
-        except Exception:
-            active = None
 
-        if active is not None and not any(hk in active for hk in self._registered_hotkeys):
-            log.warning("Hotkeys appear to have been dropped by Windows, re-registering")
-            # Clear stale references (hooks are already gone)
-            self._registered_hotkeys.clear()
-            self._registered_release_hooks.clear()
-            self._register_hotkeys()
-            return  # _register_hotkeys restarts the watchdog
+        if self._hold_active or self._toggle_active:
+            # A recording is in progress — defer until it finishes naturally.
+            log.debug("Hotkey watchdog: recording in progress, deferring refresh")
+            self._start_watchdog()
+            return
 
-        log.debug("Hotkey watchdog: hooks still active")
-        self._start_watchdog()  # schedule next check
+        log.debug("Hotkey watchdog: refreshing hook registrations")
+        # Full unregister → re-register cycle to recover any dropped hooks.
+        # _unregister_hotkeys stops the watchdog timer; _register_hotkeys restarts it.
+        self._unregister_hotkeys()
+        self._register_hotkeys()
 
     # Public API
     def start(self):
