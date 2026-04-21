@@ -282,6 +282,8 @@ async def stop_recording():
 @server.method()
 async def start_test_recording():
     """Start recording for onboarding test (no hotkey needed)."""
+    import main as _main
+    _main._mic_test_active = True
     controller = get_controller()
     controller.start_test_recording()
     return {"success": True}
@@ -290,6 +292,8 @@ async def start_test_recording():
 @server.method()
 async def stop_test_recording():
     """Stop test recording, transcribe, and return result (no paste/history)."""
+    import main as _main
+    _main._mic_test_active = False
     controller = get_controller()
     result = controller.stop_test_recording()
     return result

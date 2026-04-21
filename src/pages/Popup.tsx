@@ -68,6 +68,11 @@ function crPath(pts: Array<[number, number]>): string {
   return d;
 }
 
+/** Quantize a value to the nearest step — reduces SVG filter recalculations */
+function quantize(value: number, step: number): number {
+  return Math.round(value / step) * step;
+}
+
 /** HSL color helper */
 function hsl(h: number, s: number, l: number, a = 1): string {
   return a < 1
@@ -129,14 +134,14 @@ function MultiWaveViz({ audio, animTime }: { audio: AudioData; animTime: number 
     });
   }
 
-  const glowStd = 4 + amplitude * 10;
+  const glowStd = quantize(4 + amplitude * 10, 0.5);
 
   return (
     <div style={{
       padding: "5px 4px",
       borderRadius: "12px",
       background: "rgba(0, 0, 0, 0.72)",
-      boxShadow: `0 0 ${10 + amplitude * 20}px rgba(80, 180, 255, ${0.15 + amplitude * 0.45})`,
+      boxShadow: `0 0 ${quantize(10 + amplitude * 20, 1)}px rgba(80, 180, 255, ${quantize(0.15 + amplitude * 0.45, 0.05)})`,
       cursor: "grab",
     }}>
       <svg width={SVG_W / 2} height={SVG_H / 2} viewBox={`0 0 ${SVG_W} ${SVG_H}`} overflow="visible"
@@ -240,7 +245,7 @@ function RingViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
     });
   }, [hiBands, animTime, amplitude]);
 
-  const barGlowStd = 3 + amplitude * 8;
+  const barGlowStd = quantize(3 + amplitude * 8, 0.5);
 
   return (
     <svg width={SIZE / 2} height={SIZE / 2} viewBox={`0 0 ${SIZE} ${SIZE}`}
@@ -399,14 +404,14 @@ function BarViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
     });
   }
 
-  const glowStd = 3 + amplitude * 8;
+  const glowStd = quantize(3 + amplitude * 8, 0.5);
 
   return (
     <div style={{
       padding: "5px 4px",
       borderRadius: "12px",
       background: "rgba(0, 0, 0, 0.72)",
-      boxShadow: `0 0 ${10 + amplitude * 20}px rgba(100, 50, 255, ${0.15 + amplitude * 0.40})`,
+      boxShadow: `0 0 ${quantize(10 + amplitude * 20, 1)}px rgba(100, 50, 255, ${quantize(0.15 + amplitude * 0.40, 0.05)})`,
       cursor: "grab",
     }}>
       <svg width={SVG_W / 2} height={SVG_H / 2} viewBox={`0 0 ${SVG_W} ${SVG_H}`} overflow="visible"
@@ -506,12 +511,12 @@ function ScopeViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
   }, [samples, amplitude, animTime]);
 
   const pathD = crPath(pts);
-  const glowStd = 2 + amplitude * 7;
+  const glowStd = quantize(2 + amplitude * 7, 0.5);
 
   // Phosphor green, brightens with amplitude
-  const phosphorColor = `rgba(0, 255, 110, ${0.85 + amplitude * 0.15})`;
-  const glowColor = `rgba(0, 255, 80, ${0.25 + amplitude * 0.55})`;
-  const outerGlow = 7 + amplitude * 16;
+  const phosphorColor = `rgba(0, 255, 110, ${quantize(0.85 + amplitude * 0.15, 0.05)})`;
+  const glowColor = `rgba(0, 255, 80, ${quantize(0.25 + amplitude * 0.55, 0.05)})`;
+  const outerGlow = quantize(7 + amplitude * 16, 1);
 
   return (
     <div style={{
@@ -519,7 +524,7 @@ function ScopeViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
       borderRadius: "10px",
       background: "linear-gradient(145deg, rgba(0,13,8,0.78), rgba(0,8,16,0.78))",
       boxShadow: [
-        `0 0 ${outerGlow}px rgba(0,255,80,${0.10 + amplitude * 0.30})`,
+        `0 0 ${outerGlow}px rgba(0,255,80,${quantize(0.10 + amplitude * 0.30, 0.05)})`,
         `inset 0 0 12px rgba(0,20,10,0.6)`,
         `inset 0 1px 0 rgba(0,255,80,0.06)`,
       ].join(", "),
@@ -617,14 +622,14 @@ function NebulaViz({ audio, animTime }: { audio: AudioData; animTime: number }) 
     });
   }, [bands, amplitude, animTime]);
 
-  const blurR = 14 + amplitude * 22;
+  const blurR = quantize(14 + amplitude * 22, 0.5);
 
   return (
     <div style={{
       padding: "4px",
       borderRadius: "10px",
       background: "rgba(2, 3, 7, 0.70)",
-      boxShadow: `0 0 ${9 + amplitude * 21}px rgba(120, 60, 255, ${0.10 + amplitude * 0.32})`,
+      boxShadow: `0 0 ${quantize(9 + amplitude * 21, 1)}px rgba(120, 60, 255, ${quantize(0.10 + amplitude * 0.32, 0.05)})`,
       cursor: "grab",
     }}>
       <svg width={SVG_W / 2} height={SVG_H / 2} viewBox={`0 0 ${SVG_W} ${SVG_H}`}
@@ -693,14 +698,14 @@ function VortexViz({ audio, animTime }: { audio: AudioData; animTime: number }) 
     });
   }, [bands, amplitude, animTime]);
 
-  const glowStd = 3 + amplitude * 6;
+  const glowStd = quantize(3 + amplitude * 6, 0.5);
 
   return (
     <div style={{
       padding: "4px",
       borderRadius: "10px",
       background: "radial-gradient(ellipse 80% 120% at 50% 50%, rgba(3,6,20,0.75) 0%, rgba(1,2,8,0.75) 100%)",
-      boxShadow: `0 0 ${8 + amplitude * 19}px rgba(80, 60, 255, ${0.10 + amplitude * 0.28})`,
+      boxShadow: `0 0 ${quantize(8 + amplitude * 19, 1)}px rgba(80, 60, 255, ${quantize(0.10 + amplitude * 0.28, 0.05)})`,
       cursor: "grab",
     }}>
       <svg width={SVG_W / 2} height={SVG_H / 2} viewBox={`0 0 ${SVG_W} ${SVG_H}`}
@@ -770,14 +775,14 @@ function FlameViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
   }, [bands, amplitude, animTime]);
 
   const bw = SVG_W / FLAME_COUNT * 0.88;
-  const glowStd = 3 + amplitude * 6;
+  const glowStd = quantize(3 + amplitude * 6, 0.5);
 
   return (
     <div style={{
       padding: "4px",
       borderRadius: "10px",
       background: "rgba(6, 1, 0, 0.72)",
-      boxShadow: `0 0 ${10 + amplitude * 25}px rgba(255, 100, 0, ${0.12 + amplitude * 0.38})`,
+      boxShadow: `0 0 ${quantize(10 + amplitude * 25, 1)}px rgba(255, 100, 0, ${quantize(0.12 + amplitude * 0.38, 0.05)})`,
       cursor: "grab",
     }}>
       <svg width={SVG_W / 2} height={SVG_H / 2} viewBox={`0 0 ${SVG_W} ${SVG_H}`}
@@ -865,14 +870,14 @@ function HelixViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
     return { s1, s2, rungs };
   }, [bands, amplitude, animTime]);
 
-  const glowStd = 2.5 + amplitude * 6;
+  const glowStd = quantize(2.5 + amplitude * 6, 0.5);
 
   return (
     <div style={{
       padding: "4px",
       borderRadius: "10px",
       background: "rgba(1, 5, 8, 0.72)",
-      boxShadow: `0 0 ${8 + amplitude * 19}px rgba(0, 180, 255, ${0.10 + amplitude * 0.30})`,
+      boxShadow: `0 0 ${quantize(8 + amplitude * 19, 1)}px rgba(0, 180, 255, ${quantize(0.10 + amplitude * 0.30, 0.05)})`,
       cursor: "grab",
     }}>
       <svg width={SVG_W / 2} height={SVG_H / 2} viewBox={`0 0 ${SVG_W} ${SVG_H}`}
@@ -922,8 +927,13 @@ function HelixViz({ audio, animTime }: { audio: AudioData; animTime: number }) {
 export function Popup() {
   const [state, setState] = useState<PopupState>("idle");
   const [vizStyle, setVizStyle] = useState<VisualizerStyle>("multiwave");
-  const [audio, setAudio] = useState<AudioData>(EMPTY_AUDIO);
-  const [animTime, setAnimTime] = useState(0);
+  // Audio data stored in a ref so amplitude events don't trigger re-renders.
+  // The rAF loop is the sole source of state updates, capped at ~30fps.
+  const audioRef = useRef<AudioData>(EMPTY_AUDIO);
+  const [frame, setFrame] = useState<{ audio: AudioData; animTime: number }>({
+    audio: EMPTY_AUDIO,
+    animTime: 0,
+  });
   const rafRef = useRef<number>(0);
 
   useLayoutEffect(() => {
@@ -950,7 +960,7 @@ export function Popup() {
   }, []);
 
   useEffect(() => {
-    const handleAmplitude = (e: CustomEvent<AudioData>) => setAudio(e.detail);
+    const handleAmplitude = (e: CustomEvent<AudioData>) => { audioRef.current = e.detail; };
     const handleState = (e: CustomEvent<{ state: PopupState }>) => setState(e.detail.state);
     const handleStyle = (e: CustomEvent<{ style: string }>) =>
       setVizStyle(e.detail.style as VisualizerStyle);
@@ -965,16 +975,23 @@ export function Popup() {
     };
   }, []);
 
-  // rAF loop for animation timing
+  // Single rAF loop — the only source of React state updates during recording.
+  // Reads audioRef each tick so amplitude events never trigger re-renders on their own.
+  // Throttled to ~30fps (one setState per 33ms) to match what Qt WebEngine can
+  // smoothly composite, cutting renders from ~75/sec to ~30/sec.
   useEffect(() => {
     if (state !== "recording") {
       cancelAnimationFrame(rafRef.current);
       return;
     }
     let startTs: number | null = null;
+    let lastFrame = 0;
     const tick = (ts: number) => {
       if (startTs === null) startTs = ts;
-      setAnimTime((ts - startTs) / 1000);
+      if (ts - lastFrame >= 32) {  // ~30fps cap
+        lastFrame = ts;
+        setFrame({ animTime: (ts - startTs) / 1000, audio: audioRef.current });
+      }
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
@@ -1010,15 +1027,15 @@ export function Popup() {
       {/* RECORDING: Visualizer */}
       {state === "recording" && (
         <>
-          {vizStyle === "ring"   && <RingViz   audio={audio} animTime={animTime} />}
-          {vizStyle === "bar"    && <BarViz    audio={audio} animTime={animTime} />}
-          {vizStyle === "scope"  && <ScopeViz  audio={audio} animTime={animTime} />}
-          {vizStyle === "nebula" && <NebulaViz audio={audio} animTime={animTime} />}
-          {vizStyle === "vortex" && <VortexViz audio={audio} animTime={animTime} />}
-          {vizStyle === "flame"  && <FlameViz  audio={audio} animTime={animTime} />}
-          {vizStyle === "helix"  && <HelixViz  audio={audio} animTime={animTime} />}
+          {vizStyle === "ring"   && <RingViz   audio={frame.audio} animTime={frame.animTime} />}
+          {vizStyle === "bar"    && <BarViz    audio={frame.audio} animTime={frame.animTime} />}
+          {vizStyle === "scope"  && <ScopeViz  audio={frame.audio} animTime={frame.animTime} />}
+          {vizStyle === "nebula" && <NebulaViz audio={frame.audio} animTime={frame.animTime} />}
+          {vizStyle === "vortex" && <VortexViz audio={frame.audio} animTime={frame.animTime} />}
+          {vizStyle === "flame"  && <FlameViz  audio={frame.audio} animTime={frame.animTime} />}
+          {vizStyle === "helix"  && <HelixViz  audio={frame.audio} animTime={frame.animTime} />}
           {(vizStyle === "multiwave" || !["ring","bar","scope","nebula","vortex","flame","helix"].includes(vizStyle)) && (
-            <MultiWaveViz audio={audio} animTime={animTime} />
+            <MultiWaveViz audio={frame.audio} animTime={frame.animTime} />
           )}
         </>
       )}

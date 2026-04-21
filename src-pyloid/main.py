@@ -122,6 +122,11 @@ popup_window = None
 # Managed exclusively by signal slots (main-thread) to avoid cross-thread races.
 _inflight_sessions = 0
 
+# Set to True only while the onboarding mic test is running.
+# Amplitude events are sent to the main window only when this is True,
+# avoiding unnecessary 15Hz IPC to the dashboard webview during normal use.
+_mic_test_active = False
+
 
 def show_dashboard():
     app.show_and_focus_main_window()
@@ -449,10 +454,11 @@ def send_main_window_event(name, detail):
 
 def _on_amplitude_slot(data):
     """Slot: Actual amplitude handler - runs on main thread via signal."""
-    # Send to popup if it exists
     send_popup_event('amplitude', data)
-    # Also send to main window (for onboarding mic test)
-    send_main_window_event('amplitude', data)
+    # Only forward to main window during the onboarding mic test — avoids
+    # sending 15Hz IPC to the dashboard webview during normal recording.
+    if _mic_test_active:
+        send_main_window_event('amplitude', data)
 
 def on_amplitude(data):
     """Called from audio thread - emits signal to main Qt thread."""
