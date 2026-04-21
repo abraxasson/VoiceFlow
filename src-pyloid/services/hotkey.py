@@ -1,9 +1,52 @@
 import keyboard
 from typing import Callable, Optional
+import sys
 import threading
 from services.logger import get_logger
 
 log = get_logger("hotkey")
+
+# Windows Virtual Key codes used to verify physical key state via GetAsyncKeyState.
+# This bypasses the keyboard library's internal state tracking, which can become
+# stale — most notably the Win key, whose key-up event Windows sometimes drops
+# when the shell intercepts Win+key combinations (e.g. Win+D, Win+L).
+_WIN32_VK = {
+    'ctrl':  0x11,  # VK_CONTROL
+    'alt':   0x12,  # VK_MENU
+    'shift': 0x10,  # VK_SHIFT
+    # Win key checked specially via VK_LWIN + VK_RWIN
+}
+_VK_LWIN = 0x5B
+_VK_RWIN = 0x5C
+
+
+def _keys_physically_pressed(keys: list) -> bool:
+    """Return True if every key in *keys* is physically held down right now.
+
+    On Windows we query GetAsyncKeyState (kernel-level, not the keyboard
+    library's potentially stale state).  On other platforms we fall back to
+    keyboard.is_pressed().  Failures are treated as "pressed" so a broken
+    API call never blocks a legitimate hotkey.
+    """
+    if sys.platform != 'win32':
+        return all(keyboard.is_pressed(k) for k in keys)
+    try:
+        import ctypes
+        gas = ctypes.windll.user32.GetAsyncKeyState
+        for key in keys:
+            if key in ('win', 'windows', 'left windows', 'right windows'):
+                if not ((gas(_VK_LWIN) & 0x8000) or (gas(_VK_RWIN) & 0x8000)):
+                    return False
+            elif key in _WIN32_VK:
+                if not (gas(_WIN32_VK[key]) & 0x8000):
+                    return False
+            else:
+                # Function keys and other non-modifier keys
+                if not keyboard.is_pressed(key):
+                    return False
+        return True
+    except Exception:
+        return True  # Don't block legitimate presses if the API fails
 
 
 # Canonical modifier order for consistent hotkey strings
@@ -198,6 +241,18 @@ class HotkeyService:
         if self._hold_active or self._toggle_active:
             return  # Already recording in some mode
 
+        # Verify the combination is physically pressed right now using the OS
+        # key state (not the keyboard library's internal tracking).  The Win key
+        # is particularly prone to state desync on Windows: if the shell
+        # intercepts a Win+key combo it can drop the key-up event, leaving the
+        # library believing Win is still held.  A subsequent Ctrl press would
+        # then look like Ctrl+Win and fire a false-positive activation, causing
+        # the popup to briefly flash on screen.
+        keys = self._parse_hotkey_keys(self._hold_hotkey)
+        if not _keys_physically_pressed(keys):
+            log.debug("Hold hotkey false positive suppressed (stale key state)")
+            return
+
         self._hold_active = True
         log.info("Hold hotkey activated")
         try:
@@ -251,6 +306,12 @@ class HotkeyService:
 
         try:
             if not self._toggle_active:
+                # Verify physical key state before starting (same Win-key desync
+                # issue as hold mode — see _on_hold_press for details).
+                keys = self._parse_hotkey_keys(self._toggle_hotkey)
+                if not _keys_physically_pressed(keys):
+                    log.debug("Toggle hotkey false positive suppressed (stale key state)")
+                    return
                 # Start recording
                 self._toggle_active = True
                 log.info("Toggle hotkey activated - recording started")
