@@ -12,25 +12,6 @@ VoiceFlow brings OpenAI's Whisper directly to your Windows machine. Every word y
 
 ---
 
-### Why Pay for Noise?
-
-Cloud dictation services charge monthly fees while harvesting your voice data. VoiceFlow is free, fully local, and yours forever.
-
-<p align="center">
-  <img src="media/comparison.png" alt="Comparison" width="100%">
-</p>
-
-| Feature | VoiceFlow | Cloud Services |
-| :--- | :---: | :---: |
-| **Cost** | **$0.00** | $10-15/mo |
-| **Data Privacy** | **100% Local** | Cloud Processed |
-| **Offline Support** | **Full Capability** | None |
-| **Latency** | **Real-time** | Network Dependent |
-| **Account Required** | **No** | Yes |
-| **Open Source** | **MIT License** | Proprietary |
-
----
-
 ### Unbreakable Privacy
 
 Everything runs on localhost. Your microphone data never leaves your RAM. We can't sell your data because we never see it.
