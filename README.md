@@ -107,25 +107,6 @@ Choose from 16+ Whisper models optimized for different use cases.
 
 ---
 
-### Ready to go local?
-
-Take back control of your voice data. Open source and forever free.
-
-<p align="center">
-  <a href="https://github.com/abraxasson/VoiceFlow/releases/download/v1.5.3/VoiceFlowSetup-1.5.3.exe">
-    <img src="media/footer.png" alt="Download Now" width="100%">
-  </a>
-</p>
-
-### [Download Installer v1.5.3 (Windows)](https://github.com/abraxasson/VoiceFlow/releases/download/v1.5.3/VoiceFlowSetup-1.5.3.exe)
-
-*Windows 10/11 • 64-bit • ~150MB*
-
-<br>
-<br>
-
----
-
 # For Developers
 
 Build and contribute to VoiceFlow.
