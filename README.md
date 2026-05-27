@@ -10,15 +10,6 @@
 
 VoiceFlow brings OpenAI's Whisper directly to your Windows machine. Every word you speak is processed entirely on your hardware—your voice data never leaves your device. Built for privacy-conscious professionals who demand speed and reliability.
 
-<p align="center">
-  <a href="https://github.com/abraxasson/VoiceFlow/releases/download/v1.5.3/VoiceFlowSetup-1.5.3.exe">
-    <img src="https://img.shields.io/badge/Download_for_Windows-000000?style=for-the-badge&logo=windows&logoColor=white" alt="Download">
-  </a>
-  <a href="https://github.com/abraxasson/VoiceFlow">
-    <img src="https://img.shields.io/badge/View_Source-000000?style=for-the-badge&logo=github&logoColor=white" alt="GitHub">
-  </a>
-</p>
-
 ---
 
 ### Why Pay for Noise?
