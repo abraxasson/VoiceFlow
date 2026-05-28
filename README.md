@@ -107,4 +107,4 @@ pnpm run build:installer
 | **Frontend** | React 18, Vite, Tailwind CSS v4 |
 | **UI** | shadcn/ui, Lucide React |
 
-[Releases](https://github.com/abraxasson/VoiceFlow/releases) • [Issues](https://github.com/abraxasson/VoiceFlow/issues) • [License](LICENSE)
+[License](LICENSE)
